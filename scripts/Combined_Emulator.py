@@ -28,6 +28,7 @@ parser.add_argument("--emulator_dir", help="base directory of ffa emulator")
 parser.add_argument("--galcap")
 parser.add_argument("--prep", help = "do preprocessing if y", default='n')
 parser.add_argument("--emulate", help = "do emulation if y", default='n')
+#parser.add_argument("--deco", help = "anticorrelation parameter for emulator", default = 0.1)
 args = parser.parse_args()
 
 # if args.mockver == "ab_secondgen_cosmosim":
@@ -36,26 +37,30 @@ args = parser.parse_args()
 #     add_string = ""
 add_string = ""
 
+if args.mockver == "EZ_2ndgen":
+    prep_script = "/global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1EZ.py"
+else:
+    prep_script = "/global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1.py"
+
 
 getpota_indir = args.base_output + add_string 
 getpota_outdir = args.base_output + add_string
 NTILE_assign_indir = args.base_output + add_string + "SecondGenMocks/AbacusSummit/mock" + str(args.real) + "/"
 DESIwemu_indir = args.base_output + add_string + "SecondGenMocks/AbacusSummit/" 
 DESIwemu_outdir = args.emulator_dir + "fof_v1.0/in/"
-
-cmd_string1 = "python /global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1.py --rbandcut 19.5 --mockver %s --prog %s --downsampling n --overwrite 1 --realmin %s --realmax %s --base_output %s" %(args.mockver, args.prog.lower(), args.real, int(args.real) + 1, args.base_output)
+#cmd_string1 = "python /global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1.py --rbandcut 19.5 --mockver %s --prog %s --downsampling n --overwrite 1 --realmin %s --realmax %s --base_output %s" %(args.mockver, args.prog.lower(), args.real, int(args.real) + 1, args.base_output)
+cmd_string1 = "python %s --rbandcut 19.5 --mockver %s --prog %s --downsampling n --overwrite 1 --realmin %s --realmax %s --base_output %s" %(prep_script, args.mockver, args.prog.lower(), args.real, int(args.real) + 1, args.base_output)
 cmd_string2 = "python /global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/getpotaY1_mock.py --base_output %s --prog %s --realization %s --base_input %s"%(getpota_indir, args.prog.upper(), args.real, getpota_outdir)
 cmd_string3 = "python /global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/NTILE_assign.py --indir %s --tracer %s --tileloc_add y --prog %s"%(NTILE_assign_indir, args.tracer, args.prog.upper())
-cmd_string4 = "python /global/cfs/cdirs/desi/survey/catalogs/main/mocks/FAemu_preliminary/sikandar/Updated_Code_CFC/DESIAbacuswemu.py --mocknumber %s --tracer %s --basedir %s --prog %s --overwrite y --outdir %s --mocktype %s"%(args.real, args.tracer, DESIwemu_indir, args.prog.upper(),DESIwemu_outdir, args.mockver)
+cmd_string4 = "python %sDESIAbacuswemu.py --mocknumber %s --tracer %s --basedir %s --prog %s --overwrite y --outdir %s --mocktype %s"%(args.emulator_dir, args.real, args.tracer, DESIwemu_indir, args.prog.upper(),DESIwemu_outdir, args.mockver)
 print(cmd_string1)
 print(cmd_string2)
 print(cmd_string3)
 print(cmd_string4)
-
 if args.prep == 'y':
-    subprocess.run(cmd_string1, shell = True)
+    #subprocess.run(cmd_string1, shell = True)
     print("Done with prepare_mocks_y1")
-    subprocess.run(cmd_string2, shell = True)
+    #subprocess.run(cmd_string2, shell = True)
     print("Done with getpotaY1_mock")
     subprocess.run(cmd_string3, shell = True)
     print("done with NTILE_assign")
@@ -477,8 +482,12 @@ elif args.emulate == 'y':
     add_string = ""
 
     emu_out_dir = args.emulator_dir + "emulate_bitw_v1.1/out/" + args.mockver + "/"
+    if args.mockver == "EZmock":
+        pathstr = "SecondGenMocks/EZmock/"
+    elif args.mockver == "ab_secondgen_cosmosim":
+        pathstr = "SecondGenMocks/AbacusSummit/"
 
-    unred_path = args.base_output + add_string + "SecondGenMocks/AbacusSummit/mock" + str(args.real) + "/"
+    unred_path = args.base_output + add_string + pathstr + "mock" + str(args.real) + "/"
     emu_in = Table.read(emu_out_dir + args.mockver + '_corr_clustering_cat_FAemu_m' + args.real + '_' + args.galcap + '_' + args.tracer + '_llen0.02_truent_cfc.fits')
     unreduced = Table.read(unred_path + '/pota-' + args.prog.upper() + '_joined_unreduced_%s.fits'%args.tracer)
     emu_in.remove_columns(['RA', 'DEC', 'RSDZ', 'TRUEZ', 'NTILE'])

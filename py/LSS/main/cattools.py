@@ -1327,8 +1327,10 @@ def count_tiles_better(dr,pd,rann=0,specrel='daily',fibcol='COADD_FIBERSTATUS',p
             fj = fitsio.read(indir+'/rancomb_'+str(rann)+pd+'wdupspec_zdone.fits',columns=['TARGETID','TILEID','TILELOCID'])
     
     if (dr == 'mock'):
-        fj = fitsio.read(indir+ '/comb' + prog_ +'_wdupspec_zdone_' + pd + '.fits' , columns = ['TARGETID', 'TILEID', 'TILELOCID'])
-        
+        #fj = fitsio.read(indir+ '/comb' + prog_ +'_wdupspec_zdone_' + pd + '.fits' , columns = ['TARGETID', 'TILEID', 'TILELOCID'])
+        fj = fitsio.read(indir+ '/comb' + prog_ +'_wdupspec_zdone' + '.fits' , columns = ['TARGETID', 'TILEID', 'TILELOCID', 'DESI_TARGET'])
+        tardict = {'QSO': 4, 'LRG': 1, 'ELG': 34, 'BGS': 60}
+        fj = fj[fj["DESI_TARGET"]==tardict[pd]]
         #outf = '/global/cfs/cdirs/desi/survey/catalogs/SV3/LSS/random'+str(rann)+'/rancomb_'+pd+'ntileinfo.fits'
     wg = np.isin(fj['TILELOCID'],gtl)
     fjg = fj[wg]
