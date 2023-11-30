@@ -3171,10 +3171,22 @@ def add_zfail_weight2fullQSO(indir,version,qsocat,tsnrcut=80,readpars=False):
         ffc.remove_columns(['mod_success_rate'])
     ffc = join(ffc,ff,keys=['TARGETID'],join_type='left')
     common.write_LSS(ffc,outdir+tp+'_full.dat.fits',comments='added ZFAIL weight')
+
+    fname_mapveto = outdir+tp+'_full_HPmapcut.dat.fits'
+    if os.path.isfile(fname_mapveto):
+        ff.keep_columns(['TARGETID','WEIGHT_ZFAIL','mod_success_rate'])
+        ffc = Table.read(fname_mapveto)
+        cols = list(ffc.dtype.names)
+        if 'WEIGHT_ZFAIL' in cols:
+            ffc.remove_columns(['WEIGHT_ZFAIL'])
+        if 'mod_success_rate' in cols:
+            ffc.remove_columns(['mod_success_rate'])
+        ffc = join(ffc,ff,keys=['TARGETID'],join_type='left')
+        common.write_LSS(ffc,fname_mapveto)#,comments='added ZFAIL weight')
  
 
 
-def add_zfail_weight2full(indir,tp='',tsnrcut=80,readpars=False):
+def add_zfail_weight2full(indir,tp='',tsnrcut=80,readpars=False,hpmapcut='_HPmapcut'):
     import LSS.common_tools as common
     from LSS import ssr_tools_new
     '''
@@ -3187,14 +3199,14 @@ def add_zfail_weight2full(indir,tp='',tsnrcut=80,readpars=False):
 
     '''
     
-    ff = Table.read(indir+tp+'_full.dat.fits')
+    ff = Table.read(indir+tp+'_full'+hpmapcut+'.dat.fits')
     cols = list(ff.dtype.names)
     if 'Z' in cols:
         #print('Z column already in full file')
     #else:
         #ff['Z_not4clus'].name = 'Z'
         ff['Z'].name = 'Z_not4clus'
-        common.write_LSS(ff,indir+tp+'_full.dat.fits',comments='changed Z column back to Z_not4clus')
+        common.write_LSS(ff,indir+tp+'_full'+hpmapcut+'.dat.fits',comments='changed Z column back to Z_not4clus')
 
     #selobs = ff['ZWARN'] == 0
     selobs = ff['ZWARN']*0 == 0
@@ -3274,7 +3286,7 @@ def add_zfail_weight2full(indir,tp='',tsnrcut=80,readpars=False):
         #s = 1
     
     if tp == 'BGS_BRIGHT-21.5':
-        fullname = indir+tp+'_full.dat.fits'
+        fullname = indir+tp+'_full'+hpmapcut+'.dat.fits'
     else:
         fullname = indir+tp+'_full_noveto.dat.fits'
     ff = Table.read(fullname)
@@ -3319,17 +3331,17 @@ def add_zfail_weight2full(indir,tp='',tsnrcut=80,readpars=False):
             ffc.remove_columns(['mod_success_rate'])
         ffc = join(ffc,ff,keys=['TARGETID'],join_type='left')
         common.write_LSS(ffc,indir+tp+'_full.dat.fits')#,comments='added ZFAIL weight')
-    fname_mapveto = indir+tp+'_full_HPmapcut.dat.fits'
-    if os.path.isfile(fname_mapveto):
-        ff.keep_columns(['TARGETID','WEIGHT_ZFAIL','mod_success_rate'])
-        ffc = Table.read(fname_mapveto)
-        cols = list(ffc.dtype.names)
-        if 'WEIGHT_ZFAIL' in cols:
-            ffc.remove_columns(['WEIGHT_ZFAIL'])
-        if 'mod_success_rate' in cols:
-            ffc.remove_columns(['mod_success_rate'])
-        ffc = join(ffc,ff,keys=['TARGETID'],join_type='left')
-        common.write_LSS(ffc,fname_mapveto)#,comments='added ZFAIL weight')
+        fname_mapveto = indir+tp+'_full_HPmapcut.dat.fits'
+        if os.path.isfile(fname_mapveto):
+            ff.keep_columns(['TARGETID','WEIGHT_ZFAIL','mod_success_rate'])
+            ffc = Table.read(fname_mapveto)
+            cols = list(ffc.dtype.names)
+            if 'WEIGHT_ZFAIL' in cols:
+                ffc.remove_columns(['WEIGHT_ZFAIL'])
+            if 'mod_success_rate' in cols:
+                ffc.remove_columns(['mod_success_rate'])
+            ffc = join(ffc,ff,keys=['TARGETID'],join_type='left')
+            common.write_LSS(ffc,fname_mapveto)#,comments='added ZFAIL weight')
     
     
 #     if dchi2 is not None:
@@ -3364,7 +3376,7 @@ def add_zfail_weight2full(indir,tp='',tsnrcut=80,readpars=False):
 
 
 
-def mkclusdat(fl,weighttileloc=True,zmask=False,tp='',dchi2=9,tsnrcut=80,rcut=None,ntilecut=0,ccut=None,ebits=None,zmin=0,zmax=6,write_cat='y',splitNS='n',return_cat='n',compmd='ran',kemd='',wsyscol=None,use_map_veto=''):
+def mkclusdat(fl,weighttileloc=True,zmask=False,tp='',dchi2=9,tsnrcut=80,rcut=None,ntilecut=0,ccut=None,ebits=None,zmin=0,zmax=6,write_cat='y',splitNS='n',return_cat='n',compmd='ran',kemd='',wsyscol=None,use_map_veto='',subfrac=1):
     import LSS.common_tools as common
     from LSS import ssr_tools
     '''
@@ -3448,7 +3460,11 @@ def mkclusdat(fl,weighttileloc=True,zmask=False,tp='',dchi2=9,tsnrcut=80,rcut=No
         wz &= ff['TSNR2_BGS'] > tsnrcut
         print('length after tsnrcut '+str(len(ff[wz])))
 
-
+    if subfrac < 1:
+        sub_array = np.random.random(len(ff))
+        keep = sub_array < subfrac
+        wz &= keep
+        
     ff = ff[wz]
     print('length after cutting to good z '+str(len(ff)))
     ff['WEIGHT'] = np.ones(len(ff))#ff['WEIGHT_ZFAIL']
@@ -3571,7 +3587,7 @@ def mkclusdat(fl,weighttileloc=True,zmask=False,tp='',dchi2=9,tsnrcut=80,rcut=No
     ff = ff[selz]
 
 
-    kl = ['RA','DEC','Z','WEIGHT','TARGETID','NTILE','WEIGHT_SYS','WEIGHT_COMP','WEIGHT_ZFAIL','PHOTSYS']#,'WEIGHT_FKP']
+    kl = ['RA','DEC','Z','WEIGHT','TARGETID','NTILE','WEIGHT_SYS','WEIGHT_COMP','WEIGHT_ZFAIL','PHOTSYS','FRAC_TLOBS_TILES']#,'WEIGHT_FKP']
     if 'WEIGHT_FKP' in cols:
         kl.append('WEIGHT_FKP')
     if 'WEIGHT_SN' in cols:
@@ -3680,8 +3696,31 @@ def add_tlobs_ran(fl,rann,hpmapcut='',wo=True):
     common.write_LSS(ranf,outf)
     del ranf
     return True
+  
+def add_tlobs_ran_array(ranf,tlf):
+    import LSS.common_tools as common
+    tldic = dict(zip(tlf['TILES'],tlf['FRAC_TLOBS_TILES']))
+    tlarray = []
+    nt = 0
+    utls = np.unique(ranf['TILES'])
+    gtls = np.isin(utls,tlf['TILES'])
+    for tls in ranf['TILES']:
+        try:    
+            fr = tldic[tls]
+        except:
+            fr = 0
+        tlarray.append(fr)
+        if nt%100000 == 0:
+           print(nt,len(ranf))  
+        nt += 1  
+    tlarray = np.array(tlarray)
+    sel = tlarray == 0
+    print(len(tlarray[sel]),' number with 0 frac')
+    ranf['FRAC_TLOBS_TILES'] = tlarray
+    return ranf
+  
     
-def mkclusran(flin,fl,rann,rcols=['Z','WEIGHT'],zmask=False,tsnrcut=80,tsnrcol='TSNR2_ELG',utlid=False,ebits=None,write_cat='y',nosplit='y',return_cat='n',compmd='ran',clus_arrays=None,use_map_veto=''):
+def mkclusran(flin,fl,rann,rcols=['Z','WEIGHT'],zmask=False,tsnrcut=80,tsnrcol='TSNR2_ELG',utlid=False,ebits=None,write_cat='y',nosplit='y',return_cat='n',compmd='ran',clus_arrays=None,use_map_veto='',add_tlobs='n'):
     import LSS.common_tools as common
     #first find tilelocids where fiber was wanted, but none was assigned; should take care of all priority issues
     wzm = ''
@@ -3698,6 +3737,10 @@ def mkclusran(flin,fl,rann,rcols=['Z','WEIGHT'],zmask=False,tsnrcut=80,tsnrcol='
     ffc = ffr[wz]
     print('length after,before tsnr cut:')
     print(len(ffc),len(ffr))
+    del ffr
+    if add_tlobs == 'y':
+        tlf = fitsio.read(fl+'frac_tlobs.fits')
+        ffc = add_tlobs_ran_array(ffc,tlf)
     if return_cat == 'y' and nosplit=='y':
         #this option will then pass the arrays to the clusran_resamp_arrays function
         ffc.keep_columns(['RA','DEC','TARGETID','NTILE','FRAC_TLOBS_TILES','PHOTSYS'])

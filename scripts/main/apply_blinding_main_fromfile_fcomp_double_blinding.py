@@ -73,7 +73,7 @@ parser.add_argument("--version", help="catalog version", default='test')
 parser.add_argument("--survey", help="e.g., main (for all), DA02, any future DA", default='Y1')
 parser.add_argument("--verspec", help="version for redshifts", default='iron')
 parser.add_argument("--notqso", help="if y, do not include any qso targets", default='n')
-parser.add_argument("--use_map_veto",help="string to add on the end of full file reflecting if hp maps were used to cut",default='')
+parser.add_argument("--use_map_veto",help="string to add on the end of full file reflecting if hp maps were used to cut",default='_HPmapcut')
 #parser.add_argument("--reg_md", help="whether to run on split N/S or NGC/SGC", default='GC')
 
 #parser.add_argument("--split_GC", help="whether to make the split NGC/SGC", default='y')
@@ -153,6 +153,7 @@ if 'mock' not in args.verspec:
     ldirspec = maindir+specrel+'/'
 
     dirin = ldirspec+'LSScats/'+version+'/'
+    dirin_blind = ldirspec+'LSScats/'+version+'/blinded/'
     LSSdir = ldirspec+'LSScats/'
     tsnrcut = mainp.tsnrcut
     dchi2 = mainp.dchi2
@@ -169,7 +170,7 @@ elif 'Y1/mock' in args.verspec: #e.g., use 'mocks/FirstGenMocks/AbacusSummit/Y1/
 else:
     sys.exit('verspec '+args.verspec+' not supported')
 
-dirout = args.basedir_out + '/LSScats/' + version + '/'
+dirout = args.basedir_out + '/LSScats/' + version + '/doubleblinded/'
 
 def mkdir(dirname):
     """Try to create ``dirname`` and catch :class:`OSError`."""
@@ -248,8 +249,8 @@ if root:
     fbr_in = fb_in
     if type == 'BGS_BRIGHT-21.5':
         fbr_in = dirin +'BGS_BRIGHT'
-    fcr_in = fbr_in +'{}_0_clustering.ran.fits'
-    fcd_in = fb_in + '{}_clustering.dat.fits'
+    #fcr_in = fbr_in +'{}_0_clustering.ran.fits'
+    fcd_in = dirin_blind+ type + notqso+ '{}_clustering.dat.fits'
     print('input file is '+fcd_in)
     nzf_in = dirin + type + notqso + '_full_nz.txt'
     wo = 'y'
@@ -282,11 +283,32 @@ if root:
 
     if args.baoblind == 'y':
         
-        cl = gcl
-        for reg in cl:
-            fnd = fcd_in.format(reg)
+        data_clus_fn = dirin_blind + type + notqso+'_clustering.dat.fits'
+        if os.path.isfile(data_clus_fn) == False:
+            dl = []
+            regl = ['_NGC','_SGC']
+            for reg in regl:
+                dl.append(fitsio.read(dirin_blind + type + notqso+reg+'_clustering.dat.fits'))  
+                data = Table(np.concatenate(dl))
+                if 'PHOTSYS' not in list(data.dtype.names):
+                    data = common.addNS(data)
+        else:
+            data = Table(fitsio.read(data_clus_fn))
+        
+        #redo 'WEIGHT' column because of completeness factorization (applied back later if FKP option is chosen)
+        cols = list(data.dtype.names)
+        if 'WEIGHT_SYS' not in cols:
+            if args.wsyscol is not None:
+                fd['WEIGHT_SYS'] = np.copy(fd[args.wsyscol])
+            else:
+                print('did not find WEIGHT_SYS, putting it in as all 1')
+                fd['WEIGHT_SYS'] = np.ones(len(fd))
+        data['WEIGHT'] = data['WEIGHT_COMP']*data['WEIGHT_ZFAIL']*data['WEIGHT_SYS']
+        #cl = gcl
+        #for reg in cl:
+        #    fnd = fcd_in.format(reg)
             # fndr = dirout + type + notqso + fcr_in.format(reg)
-            data = Table(fitsio.read(fnd))
+        #    data = Table(fitsio.read(fnd))
             # data_real = Table(fitsio.read(fndr))
         # fin = fitsio.read(fnd)
         # cols = list(fin.dtype.names)
@@ -298,10 +320,11 @@ if root:
 
         
         # data = Table(fitsio.read(fcd_in))
-            data['Z'] = np.clip(data['Z'],0.01,3.6)
-            outf = dirout + fnd.split('/')[-1]
-            print('output going to '+outf)
-            blind.apply_zshift_DE(data, outf, w0=w0_blind, wa=wa_blind, zcol='Z')
+        data['Z'] = np.clip(data['Z'],0.01,3.6)
+        #outf = dirout + fnd.split('/')[-1]
+        outf = dirout +  type + notqso+'_clustering.dat.fits'
+        print('output going to '+outf)
+        blind.apply_zshift_DE(data, outf, w0=w0_blind, wa=wa_blind, zcol='Z')
 
         #fb_out = dirout + type + notqso
         #fcd_out = fb_out + '_full.dat.fits'
@@ -309,19 +332,12 @@ if root:
 
         # ratio_nz = nz_in / nz_out
 
-            fd = Table(fitsio.read(outf))
-            cols = list(fd.dtype.names)
-            if 'WEIGHT_SYS' not in cols:
-                if args.wsyscol is not None:
-                    fd['WEIGHT_SYS'] = np.copy(fd[args.wsyscol])
-                else:
-                    print('did not find WEIGHT_SYS, putting it in as all 1')
-                    fd['WEIGHT_SYS'] = np.ones(len(fd))
-            zl = fd['Z']
-            zr = zl > zmin
-            zr &= zl < zmax
-            fd = fd[zr]
-            common.write_LSS(fd, outf)
+        fd = Table(fitsio.read(outf))
+        zl = fd['Z']
+        zr = zl > zmin
+        zr &= zl < zmax
+        fd = fd[zr]
+        common.write_LSS(fd, outf)
 
 
     if args.visnz == 'y':
@@ -357,7 +373,19 @@ if root:
         ranin = dirin + args.type + notqso + '_'
         if args.type == 'BGS_BRIGHT-21.5':
             ranin = dirin + 'BGS_BRIGHT' + notqso + '_'
-        clus_arrays = [fitsio.read(dirout + type + notqso+'_clustering.dat.fits')]
+        data_clus_fn = dirout + type + notqso+'_clustering.dat.fits'
+        if os.path.isfile(data_clus_fn) == False:
+            dl = []
+            regl = ['_NGC','_SGC']
+            for reg in regl:
+                dl.append(fitsio.read(dirout + type + notqso+reg+'_clustering.dat.fits'))  
+                dtot = np.concatenate(dl)
+                if 'PHOTSYS' not in list(dtot.dtype.names):
+                    dtot = common.addNS(Table(dtot))
+                
+                clus_arrays = [dtot]  
+        else:
+            clus_arrays = [fitsio.read(data_clus_fn)]
         #for reg in ['N','S']:
         #    clus_arrays.append(fitsio.read(dirout + type + notqso+'_'+reg+'_clustering.dat.fits'))
         

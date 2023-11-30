@@ -289,6 +289,7 @@ class model_ssr:
             fo.write(str(chi2)+'\n')
             fo.close()
         self.pars = pars
+        plt.clf()
         plt.errorbar(self.bc,self.nzf,self.nzfe,fmt='ko',label='data')
         mod = self.failure_rate_eff(self.bc, *pars)
         plt.plot(self.bc,mod,'k--',label='model; chi2='+str(round(chi2,3)))
@@ -296,7 +297,7 @@ class model_ssr:
         plt.xlabel('TSNR2_'+tracer)
         plt.legend()
         plt.savefig(self.outdir+outfn_root+rw+'overall_failratefit.png')        
-        plt.show()
+        #plt.show()
         plt.clf()
         #fit to fiberflux trend
         print('self.cat[TSNR2_tracer]',self.cat['TSNR2_'+tracer])
@@ -337,10 +338,12 @@ class model_ssr:
         else:
             if tracer == 'LRG':
                self.fluxfittype = 'piecewise'
+               print('about to do linear fit for flux dependence')
                rest = minimize(lambda params: self.hist_norm(params, fluxfittype='linear'), [2,self.mft],method='Powell')
                fcoeff_start, piv_start = rest.x
                #if reg == 'N':
                #print('reg',reg)
+               print('linear fit done, now doing piecewise')
                rest = minimize(lambda params: self.hist_norm(params, fluxfittype=self.fluxfittype), [fcoeff_start, piv_start, 3],method='Powell')
                #elif reg == 'S':
                #    print('reg',reg)
@@ -349,7 +352,8 @@ class model_ssr:
                #method='Powell', tol=1e-6)
                fcoeff,piv,C = rest.x
                self.vis_5hist = True
-               chi2 = self.hist_norm([fcoeff,piv,C],fluxfittype=self.fluxfittype)
+               chi2 = self.hist_norm([fcoeff,piv,C],fluxfittype=self.fluxfittype,outfn=outfn_root+rw+'5histfit.png')
+               print('results and chi2:')
                print(fcoeff,piv,C,chi2)#,self.hist_norm(0.),self.hist_norm(1.)) 
                fo = open(self.outdir+outfn_root+rw+'pars_fluxfit.txt','w')
                fo.write('#'+self.band+'flux fit\n')
@@ -360,12 +364,14 @@ class model_ssr:
                fo.close()
             else:
                self.fluxfittype = 'linear'
+               print('about to do linear fit for flux dependence')
                rest = minimize(lambda params: self.hist_norm(params, fluxfittype=self.fluxfittype), [2,self.mft],method='Powell')
                #rest = minimize(self.hist_norm, [2,self.mft],method='Powell')#np.ones(1))#, bounds=((-10, 10)),
                #method='Powell', tol=1e-6)
                fcoeff,piv = rest.x
                self.vis_5hist = True
-               chi2 = self.hist_norm([fcoeff,piv],fluxfittype=self.fluxfittype)
+               chi2 = self.hist_norm([fcoeff,piv],fluxfittype=self.fluxfittype,outfn=outfn_root+rw+'5histfit.png')
+               print('results and chi2:')
                print(fcoeff,piv,chi2)#,self.hist_norm(0.),self.hist_norm(1.)) 
                fo = open(self.outdir+outfn_root+rw+'pars_fluxfit.txt','w')
                fo.write('#'+self.band+'flux fit\n')
@@ -437,7 +443,8 @@ class model_ssr:
             plt.plot(self.mfl,self.flux_mod(self.mfl),'r--')
             plt.plot(self.flux_vals,self.ssr_flux,'ko')
             plt.plot(self.flux_vals,self.flux_mod(self.flux_vals),'k-')
-            plt.show()
+            plt.savefig(self.outdir+outfn_root+rw+'flux_dep.png') 
+            #plt.show()
            
             
         
@@ -468,8 +475,8 @@ class model_ssr:
     def hist_norm(self,params,fluxfittype='linear',outfn='test.png'):
         if (fluxfittype != 'linear') and (fluxfittype != 'piecewise'):
             print('ERROR, fluxfittype must be either linear or piecewise')
-        print('call to hist norm, params',params)
-        print('len of mod.cat',len(self.cat['FIBERFLUX_'+self.band+'_EC']))
+        #print('call to hist norm, params',params)
+        #print('len of mod.cat',len(self.cat['FIBERFLUX_'+self.band+'_EC']))
         t0 = time.time()
         nzfper = []
         consl = []
@@ -525,7 +532,7 @@ class model_ssr:
             cost = ccost(bc)
             consl.append(bc[0])
             costt += cost
-            print('cost',cost)
+            #print('cost',cost)
         if self.vis_5hist:
             for i in range(0,nb):
                 plt.errorbar(self.bc,nzfper[i],self.nzfpere[i])
@@ -533,14 +540,15 @@ class model_ssr:
             plt.ylabel(self.outfn_root+' Z success rate, in fiber bins')
             plt.xlabel('TSNR2_'+self.tracer)
             plt.legend()
-            plt.savefig(self.outdir+outfn)        
+            plt.savefig(self.outdir+outfn)
+            plt.clf()        
 
-            plt.show()
+            #plt.show()
             self.consl = consl
             self.mfl = mfl
             
-        print('time for hist_norm',time.time()-t0)
-        print('costt',costt)
+        #print('time for hist_norm',time.time()-t0)
+        #print('costt',costt)
         return costt    
         
     

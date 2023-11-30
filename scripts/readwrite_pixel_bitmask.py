@@ -20,7 +20,7 @@ import argparse
 
 time_start = time.time()
 
-n_processes = 64
+n_processes = 128
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-t', '--tracer', required=True)
@@ -28,7 +28,7 @@ parser.add_argument('-i', '--input', required=True)
 #parser.add_argument('-o', '--output', required=True)
 parser.add_argument('-v', '--version', default='none', required=False)
 parser.add_argument('-rv', '--tarver', default='targetsDR9v1.1.1', required=False)
-parser.add_argument( '--cat_type', default='targets', choices=['targets','ran','obielg','Ab2ndgen'],required=False)
+parser.add_argument( '--cat_type', default='targets')#, choices=['targets','ran','obielg','Ab2ndgen'],required=False)
 parser.add_argument( '--reg', default='north', choices=['north','south'],required=False)
 
 args = parser.parse_args()
@@ -44,6 +44,10 @@ if args.cat_type == 'obielg':
     output_path = '/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/elg_obiwan_'+args.reg+'_matched_input_full_'+args.tracer+'_imask.fits'
 if args.cat_type == 'Ab2ndgen':
     mockdir = '/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/AbacusSummit/'
+    input_path = mockdir+'forFA'+args.input+'.fits'
+    output_path = mockdir+'forFA'+args.input+'_matched_input_full_'+args.tracer+'_imask.fits'
+if args.cat_type == 'Y1EZmock':
+    mockdir = '/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA/forFA/'
     input_path = mockdir+'forFA'+args.input+'.fits'
     output_path = mockdir+'forFA'+args.input+'_matched_input_full_'+args.tracer+'_imask.fits'
    

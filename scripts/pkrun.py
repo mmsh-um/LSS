@@ -131,8 +131,6 @@ def compute_power_spectrum(edges, distance, dtype='f8', wang=None, weight_type='
         if mpicomm.rank == mpiroot:
             window = PowerSpectrumSmoothWindow.concatenate_x(*windows, frac_nyq=0.9)
             # Let us compute the wide-angle and window function matrix
-            kout = result.k # output k-bins
-            ellsout = [0, 2, 4] # output multipoles
             ellsin = [0, 2, 4] # input (theory) multipoles
             wa_orders = 1 # wide-angle order
             sep = np.geomspace(1e-4, 2e4, 1024*16) # configuration space separation for FFTlog, 2e4 > sqrt(3) * 8000
@@ -142,7 +140,7 @@ def compute_power_spectrum(edges, distance, dtype='f8', wang=None, weight_type='
             # theory multipoles at wa_order = 0, and wide-angle terms at wa_order = 1
             projsin = ellsin + PowerSpectrumOddWideAngleMatrix.propose_out(ellsin, wa_orders=wa_orders)
             # Window matrix
-            wmatrix = PowerSpectrumSmoothWindowMatrix(kout, projsin=projsin, projsout=ellsout, window=window, sep=sep, kin_rebin=kin_rebin, kin_lim=kin_lim)
+            wmatrix = PowerSpectrumSmoothWindowMatrix(result, projsin=projsin, window=window, sep=sep, kin_rebin=kin_rebin, kin_lim=kin_lim)
             # We resum over theory odd-wide angle
             wmatrix.resum_input_odd_wide_angle()
 
@@ -170,12 +168,15 @@ def power_fn(file_type='npy', region='', tracer='ELG', tracer2=None, zmin=0, zma
     return os.path.join(out_dir, '{}_{}.txt'.format(file_type, root))
 
 
-def window_fn(file_type='npy', region='', tracer='ELG', tracer2=None, zmin=0, zmax=np.inf, recon_dir='n', rec_type=False, weight_type='default', bin_type='lin', rpcut=None, out_dir='.'):
+def window_fn(file_type='npy', region='', tracer='ELG', tracer2=None, zmin=0, zmax=np.inf, recon_dir='n', rec_type=False, weight_type='default', bin_type='lin',option=None, rpcut=None, out_dir='.'):
     if tracer2: tracer += '_' + tracer2
     if rec_type: tracer += '_' + rec_type
     if region: tracer += '_' + region
     if recon_dir != 'n':
         out_dir = out_dir[:-2] + recon_dir+'/pk/'
+    if option:
+        zmax = str(zmax) + option
+
     root = '{}_{}_{}_{}_{}'.format(tracer, zmin, zmax, weight_type, bin_type)
     if rpcut is not None:
         root += '_rpcut{}'.format(rpcut)
@@ -184,12 +185,15 @@ def window_fn(file_type='npy', region='', tracer='ELG', tracer2=None, zmin=0, zm
     return os.path.join(out_dir, '{}_{}.txt'.format(file_type, root))
 
 
-def wmatrix_fn(region='', tracer='ELG', tracer2=None, zmin=0, zmax=np.inf, recon_dir='n', rec_type=False, weight_type='default', bin_type='lin', rpcut=None, out_dir='.'):
+def wmatrix_fn(region='', tracer='ELG', tracer2=None, zmin=0, zmax=np.inf, recon_dir='n', rec_type=False, weight_type='default', bin_type='lin',option=None, rpcut=None, out_dir='.'):
     if tracer2: tracer += '_' + tracer2
     if rec_type: tracer += '_' + rec_type
     if region: tracer += '_' + region
     if recon_dir != 'n':
         out_dir = out_dir[:-2] + recon_dir+'/pk/'
+    if option:
+        zmax = str(zmax) + option
+
     root = '{}_{}_{}_{}_{}'.format(tracer, zmin, zmax, weight_type, bin_type)
     if rpcut is not None:
         root += '_rpcut{}'.format(rpcut)
@@ -201,8 +205,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--tracer', help='tracer(s) to be selected - 2 for cross-correlation', type=str, nargs='+', default=['ELG'])
     parser.add_argument('--basedir', help='where to find catalogs', type=str, default='/global/cfs/cdirs/desi/survey/catalogs/')
-    parser.add_argument('--survey', help='e.g., SV3 or main', type=str, choices=['SV3', 'DA02', 'main', 'Y1'], default='SV3')
-    parser.add_argument('--verspec', help='version for redshifts', type=str, default='guadalupe')
+    parser.add_argument('--survey', help='e.g., SV3 or main', type=str, choices=['SV3', 'DA02', 'main', 'Y1'], default='Y1')
+    parser.add_argument('--verspec', help='version for redshifts', type=str, default='iron')
     parser.add_argument('--version', help='catalog version', type=str, default='test')
     parser.add_argument('--ran_sw', help='extra string in random name', type=str, default='')
     parser.add_argument('--region', help='regions; by default, run on N, S; pass NS to run on concatenated N + S', type=str, nargs='*', choices=['N', 'S', 'NS', 'NGC', 'SGC'], default=None)

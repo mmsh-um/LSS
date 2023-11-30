@@ -72,11 +72,15 @@ parser.add_argument("--absmagmd", help="whether to use purely photometry+z based
 
 parser.add_argument("--blinded", help="are we running on the blinded full catalogs?",default='n')
 
+parser.add_argument("--swap20211212", help="swap petal 9 redshifts from 20211212",default='n')
+parser.add_argument("--fixzwarn", help="change any originally 'not observed' zwarn back to 999999",default='n')
+
+
 parser.add_argument("--prepsysnet",help="prepare data to get sysnet weights for imaging systematics?",default='n')
 parser.add_argument("--add_sysnet",help="add sysnet weights for imaging systematics to full files?",default='n')
 parser.add_argument("--imsys_zbin",help="if yes, do imaging systematic regressions in z bins",default='y')
 
-
+parser.add_argument("--imsys",help="add weights for imaging systematics using eboss method?",default='n')
 
 parser.add_argument("--regressis",help="RF weights for imaging systematics?",default='n')
 parser.add_argument("--add_regressis",help="add RF weights for imaging systematics?",default='n')
@@ -103,10 +107,12 @@ parser.add_argument("--readpars",help="set to y for certain steps if you want to
 
 
 #options not typically wanted
-parser.add_argument("--imsys",help="add weights for imaging systematics using eboss method?",default='n')
+
 parser.add_argument("--ran_utlid", help="cut randoms so that they only have 1 entry per tilelocid",default='n')
 parser.add_argument("--swapz", help="if blinded, swap some fraction of redshifts?",default='n')
 
+#AJRM 
+parser.add_argument("--use_allsky_rands", help="if yes, use all sky randoms to get fractional area per pixel for SYSNet data preparation",default='n')
 
 args = parser.parse_args()
 print(args)
@@ -320,17 +326,6 @@ if mkfulld:
         maskcoll = True
     ct.mkfulldat(dz,imbits,ftar,type,bit,dirout+type+notqso+'_full_noveto.dat.fits',tlf,survey=args.survey,maxp=maxp,azf=azf,azfm=azfm,desitarg=desitarg,specver=specrel,notqso=notqso,min_tsnr2=tsnrcut,badfib=mainp.badfib,mask_coll=maskcoll)
 
-if args.add_bitweight == 'y':
-    logf.write('added bitweights to data catalogs for '+tp+' '+str(datetime.now()))
-    fn = dirout+type+notqso+'_full_noveto.dat.fits'
-    ff = fitsio.read(fn)
-    if type[:3] != 'BGS':
-        bitf = fitsio.read(mainp.darkbitweightfile)
-    else:
-        bitf = fitsio.read(mainp.brightbitweightfile)
-    ff = join(ff,bitf,keys=['TARGETID'],join_type='left')
-    common.write_LSS(ff,fn,comments='Added alt MTL info')
-
 
 if args.add_veto == 'y':
     logf.write('added veto columns to data catalogs for '+tp+' '+str(datetime.now()))
@@ -470,9 +465,6 @@ if args.add_tlcomp == 'y':
         with Pool(processes=nproc) as pool:
             res = pool.map(_parfun, inds)
 
-    
-        
-
 rcols=['Z','WEIGHT','WEIGHT_SYS','WEIGHT_COMP','WEIGHT_ZFAIL','WEIGHT_SN','WEIGHT_RF','TARGETID_DATA']#,'WEIGHT_FKP']#,'WEIGHT_RF']
 if type[:3] == 'BGS':
     fcols = ['G','R','Z','W1','W2']
@@ -562,9 +554,80 @@ if args.add_ke == 'y':
             #if args.test == 'n':
         common.write_LSS(res,fn,comments=['added k+e corrections'])
     
+if args.add_bitweight == 'y':
+    logf.write('added bitweights to data catalogs for '+tp+' '+str(datetime.now()))
+    fn = dirout+type+notqso+'_full'+args.use_map_veto+'.dat.fits'
+    print(fn)
+    ff = fitsio.read(fn)
+    if type[:3] != 'BGS':
+        bitf = fitsio.read(mainp.darkbitweightfile)
+    else:
+        bitf = fitsio.read(mainp.brightbitweightfile)
+    ff = join(ff,bitf,keys=['TARGETID'],join_type='left')
+    common.write_LSS(ff,fn)#,comments='Added alt MTL info')
 
+if args.swap20211212 == 'y':
+    dirspec = '/global/cfs/cdirs/desi/spectro/redux/reproc_20211212_iron/tiles/cumulative/'
+    tllist = [10376, 10380,  21386, 22541, 23406,  23414,  24518,  24567,2526,25266,26075,2840,2842,5642, 7207,  8621]
+    
+    datal = []
+    keep_cols = ['TARGETID','Z','ZWARN','DELTACHI2']
+    rename_cols = ['Z_not4clus','ZWARN','DELTACHI2']
+    if type[:3] == 'ELG':
+        eml = []
+        keep_cols = ['TARGETID','Z','ZWARN','DELTACHI2','OII_FLUX','OII_FLUX_IVAR']
+        rename_cols = ['Z_not4clus','ZWARN','DELTACHI2','OII_FLUX','OII_FLUX_IVAR']
 
+    for tl in tllist:
+        rr = fitsio.read(dirspec+str(tl)+'/20211212/redrock-9-'+str(tl)+'-thru20211212.fits')
+        datal.append(rr)
+        if type[:3] == 'ELG':
+            em = fitsio.read(dirspec+str(tl)+'/20211212/emline-9-'+str(tl)+'-thru20211212.fits')
+            eml.append(em)
+    data = np.concatenate(datal)
+    data = Table(data)
+    if type[:3] == 'ELG':
+        emd = np.concatenate(eml)
+        c2add = ['OII_FLUX','OII_FLUX_IVAR']
+        for col in c2add:
+            data[col] = emd[col]
+    data.keep_columns(keep_cols)
+    data['Z'].name = 'Z_not4clus'
+    for col in rename_cols:
+        data[col].name = col+'_4swap'
+    swap_cols = ['Z_not4clus_4swap','ZWARN_4swap','DELTACHI2_4swap']
+    if type[:3] == 'ELG':
+        o2c = np.log10(data['OII_FLUX_4swap'] * np.sqrt(data['OII_FLUX_IVAR_4swap']))+0.2*np.log10(data['DELTACHI2_4swap'])
+        data['o2c_4swap'] = o2c
+        swap_cols = ['Z_not4clus_4swap','ZWARN_4swap','DELTACHI2_4swap','OII_FLUX_4swap','OII_FLUX_IVAR_4swap','o2c_4swap']
+    fn = dirout+type+notqso+'_full'+args.use_map_veto+'.dat.fits'
+    
+    ff = fitsio.read(fn)
+    ff = join(ff,data,keys=['TARGETID'],join_type='left')
+    for col in rename_cols:
+        ff[col+'_4swap'] = ff[col+'_4swap'].filled(999999)
 
+    sel = ff['Z_not4clus_4swap'] != 999999
+    sel &= np.isin(ff['TILEID'],tllist)
+    sel &= ff['ZWARN'] != 999999 #don't flip any original not observed
+    print('rows to have redshift values replaced:')
+    print(len(ff[sel]))
+    for col in swap_cols:
+        ff[col.replace('_4swap','')][sel] = ff[col][sel]
+    ff.remove_columns(swap_cols)
+    common.write_LSS(ff,fn)
+
+if args.fixzwarn == 'y':
+    fn = dirout+type+notqso+'_full'+args.use_map_veto+'.dat.fits'    
+    ff = Table(fitsio.read(fn))
+    sel = ff['FIBER'] == 999999
+    sel &= ff['ZWARN'] != 999999
+    ff['ZWARN'][sel] = 999999
+    sel = ff['FIBER'] == 999999
+    sela = ff['ZWARN'] == 999999
+    print(len(ff[sel]),len(ff[sela]))
+    common.write_LSS(ff,fn)
+    
 #if mkclusran and mkclusdat:
 #    print('doing clustering randoms')
 #    for ii in range(rm,rx):
@@ -645,7 +708,7 @@ if args.imsys == 'y':
     dat = Table(fitsio.read(fname))
     selgood = common.goodz_infull(tp[:3],dat)
     ranl = []
-    for i in range(0,int(args.maxr)):
+    for i in range(0,1):#int(args.maxr)):
         ran = fitsio.read(os.path.join(dirout, tpstr+'_'+str(i)+'_full'+args.use_map_veto+'.ran.fits'), columns=['RA', 'DEC','PHOTSYS']) 
         ranl.append(ran)
     rands = np.concatenate(ranl)
@@ -690,6 +753,18 @@ if args.prepsysnet == 'y':
         print('made '+dirout+'/sysnet')    
 
     from LSS.imaging import sysnet_tools
+    
+    allsky_rands = None
+    if args.use_allsky_rands == 'y':
+        print('using randoms allsky for frac_area')
+        ranl = []
+        randir = '/dvs_ro/cfs/cdirs/desi/target/catalogs/dr9/0.49.0/randoms/resolve/'
+        for i in range(0,18):
+            print(f"reading allsky randoms {i+1}/18")
+            ran = fitsio.read(randir+f'randoms-allsky-1-{i}.fits',columns=['RA','DEC','PHOTSYS'])
+            ranl.append(ran)
+        allsky_rands = np.concatenate(ranl)
+    
     #_HPmapcut'
     dat = fitsio.read(os.path.join(dirout, tracer_clus+'_full'+args.use_map_veto+'.dat.fits'))
     ranl = []
@@ -717,9 +792,15 @@ if args.prepsysnet == 'y':
 
             seld = dat['PHOTSYS'] == reg
             selr = rands['PHOTSYS'] == reg
+            if args.use_allsky_rands == 'y':
+                selr_all = allsky_rands['PHOTSYS'] == reg
+                allrands = allsky_rands[selr_all]
+            else:
+                allrands = None
         
-            prep_table = sysnet_tools.prep4sysnet(dat[seld], rands[selr], sys_tab, zcolumn='Z_not4clus', zmin=zl[0], zmax=zl[1], nran_exp=None,
-                    nside=nside, nest=True, use_obiwan=False, columns=fit_maps,wtmd='fracz',tp=args.type[:3])
+            prep_table = sysnet_tools.prep4sysnet(dat[seld], rands[selr], sys_tab, zcolumn='Z_not4clus', allsky_rands=allrands, 
+                                                  zmin=zl[0], zmax=zl[1], nran_exp=None, nside=nside, nest=True, use_obiwan=False,
+                                                  columns=fit_maps,wtmd='fracz',tp=args.type[:3])
             fnout = dirout+'/sysnet/prep_'+tracer_clus+zw+'_'+reg+'.fits'
             common.write_LSS(prep_table,fnout)
 
@@ -817,6 +898,7 @@ if args.regressis == 'y':
     
         print('computing RF regressis weight for '+tracer_clus+zw)
         logf.write('computing RF regressis weight for '+tracer_clus+zw+'\n')
+        
         rt.get_desi_data_full_compute_weight(dirout, 'main', tracer_clus, nside, dirreg, zl, param,foot=dr9_footprint,nran=18,\
         suffix_tracer=suffix_tracer, suffix_regressor=suffix_regressor, cut_fracarea=cut_fracarea, seed=seed,\
          max_plot_cart=max_plot_cart,pixweight_path=pw_out_fn_root,pixmap_external=debv,sgr_stream_path=sgf,\
@@ -904,7 +986,10 @@ if args.add_sysnet == 'y':
                 zw = str(zl[0])+'_'+str(zl[1])
             sn_weights = fitsio.read(dirout+'/sysnet/'+tracer_clus+zw+'_'+reg+'/nn-weights.fits')
             pred_counts = np.mean(sn_weights['weight'],axis=1)
-            pix_weight = np.mean(pred_counts)/pred_counts
+            #pix_weight = np.mean(pred_counts)/pred_counts
+            #pix_weight = np.clip(pix_weight,0.5,2.)
+            pix_weight = 1./pred_counts
+            pix_weight = pix_weight / pix_weight.mean()
             pix_weight = np.clip(pix_weight,0.5,2.)
             sn_pix = sn_weights['hpix']
             hpmap = np.ones(12*256*256)

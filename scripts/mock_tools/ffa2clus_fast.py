@@ -44,7 +44,7 @@ parser.add_argument("--data_dir",help="where to find the data randoms",default='
 parser.add_argument("--specdata_dir",help="where to find the spec data ",default='/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/iron/')
 parser.add_argument("--minr", help="minimum number for random files",default=0,type=int)
 parser.add_argument("--maxr", help="maximum for random files, default is all 18)",default=18,type=int) 
-parser.add_argument("--mockver", default='AbacusSummit', help = "which mocks to use. use abacus2ffa for Abacus 2nd gen fast fiber assignment")
+parser.add_argument("--mockver", default='AbacusSummit', help = "which mocks to use")
 parser.add_argument("--mockcatver", default=None, help = "if not None, gets added to the output path")
 
 parser.add_argument("--tracer", default = 'all')
@@ -83,7 +83,9 @@ mapcuts = mainp.mapcuts
 #    bittest = targetmask.desi_mask
 #    desitarg='DESI_TARGET'
 if args.tracer == 'all':
-    tracers = ['QSO','ELG_LOP','LRG']
+    tracers = ['LRG','ELG_LOP','QSO']
+    #if args.mockver == 'EZmock/FFA':
+    #    tracers = ['ELG','QSO','LRG']
 else:
     tracers = [args.tracer]
     #if args.mockver == 'abacus2ffa':
@@ -102,6 +104,8 @@ def splitGC(flroot,datran='.dat',rann=0):
         app = str(rann)+'_clustering'+datran+'.fits'
 
     fn = Table(fitsio.read(flroot.replace('global','dvs_ro') +app))
+    if datran == '.ran':
+        fn.keep_columns(['RA', 'DEC', 'Z', 'WEIGHT', 'WEIGHT_FKP', 'TARGETID_DATA'])
     #c = SkyCoord(fn['RA']* u.deg,fn['DEC']* u.deg,frame='icrs')
     #gc = c.transform_to('galactic')
     sel_ngc = common.splitGC(fn)#gc.b > 0
@@ -220,16 +224,24 @@ for tracer in tracers:
         zmin = 0.4
         zmax = 1.1
         subfrac = 0.958 #fudge factor to get number density correct
+        if args.mockver == 'EZmock/FFA':
+            subfrac = 0.96
 
     elif (tracer == 'ELG_LOP') or (tracer == 'ELG'):
         zmin = 0.8
         zmax = 1.6
         subfrac = .785 #determined from ration of clustering catalogs; SGC 0.77 NGC 0.793
+        if args.mockver == 'EZmock/FFA':
+            subfrac1 = .72
+            subfrac2 = .54
+            zsplit = 1.5
 
     elif tracer == 'QSO':
         zmin = 0.8
         zmax = 2.1
         subfrac = 0.62 #determined from ratio of data with 0.8 < z < 2.1 to mock using subfrac = 1
+        if args.mockver == 'EZmock/FFA':
+            subfrac = 0.66
     elif tracer == 'BGS_BRIGHT-21.5':
         zmin = 0.1
         zmax = 0.4
@@ -251,7 +263,10 @@ for tracer in tracers:
         
         #apply imaging vetos
         if tracer == 'LRG':
-            lrgmask = fitsio.read(args.base_dir+args.mockver+'/forFA'+str(args.realization)+'_matched_input_full_lrg_imask.fits')
+            if args.mockver == 'EZmock/FFA':
+                lrgmask = fitsio.read(args.base_dir.replace('global','dvs_ro')+args.mockver+'/forFA/forFA'+str(args.realization)+'_matched_input_full_lrg_imask.fits')
+            else:
+                lrgmask = fitsio.read(args.base_dir.replace('global','dvs_ro')+args.mockver+'/forFA'+str(args.realization)+'_matched_input_full_lrg_imask.fits')
             mock_data_tr = join(mock_data_tr,lrgmask,keys=['TARGETID'])
             print(len(mock_data_tr))
         ebits = mainp.ebits
@@ -267,6 +282,11 @@ for tracer in tracers:
         mock_data_tr = mock_data_tr[selz]
         print('length after cutting to redshift range',len(mock_data_tr))
         sub_array = np.random.random(len(mock_data_tr))
+        if args.mockver == 'EZmock/FFA' and tracer == 'ELG_LOP':
+            subfrac = np.ones(len(mock_data_tr))
+            selzsub = mock_data_tr['Z'] < zsplit
+            subfrac[selzsub] = subfrac1
+            subfrac[~selzsub] = subfrac2
         keep = sub_array < subfrac
         mock_data_tr = mock_data_tr[keep]
         print('length after random sub-sampling',len(mock_data_tr))

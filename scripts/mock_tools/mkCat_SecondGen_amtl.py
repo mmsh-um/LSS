@@ -217,15 +217,6 @@ if args.tracer[:3] == 'BGS':
 if args.fulld == 'y':
     print('--- START FULLD ---')
     mainp = main(args.tracer, args.specdata, survey=args.survey)
-#inp        imbits = mainp.imbits
-    
-
-    #Question, is this necessary? Should be this or the list below?
-    maxp = 3400
-    if args.tracer[:3] == 'LRG' or notqso == 'notqso':
-        maxp = 3200
-    if args.tracer[:3] == 'BGS':
-        maxp = 2100
 
     ftar = None
     dz = os.path.join(lssdir, 'datcomb_'+pdir+'_tarspecwdup_zdone.fits')
@@ -250,18 +241,27 @@ zmax = 3.5
 P0 = 6000
 dz_step = 0.02
 
+subfrac = 1
+if tracer == 'QSO':
+    zmin = 0.8
+    zmax = 2.1
+    subfrac = 0.62 #determined from ratio of data with 0.8 < z < 2.1 to mock using subfrac = 1
+
+
 if args.tracer[:3] == 'LRG':# or notqso == 'notqso':
 #        maxp = 3200
     P0 = 10000
     dz_step = 0.01
     zmin = 0.4
     zmax = 1.1
+    subfrac = 0.945
 if args.tracer[:3] == 'ELG':
     P0 = 4000
     dz_step = 0.01
 #        maxp = 3000
     zmin = 0.8
     zmax = 1.6
+    subfrac = 0.676
 if args.tracer[:3] == 'BGS':
     P0 = 7000
     dz_step = 0.01
@@ -303,8 +303,8 @@ if args.fullr == 'y':
         from multiprocessing import Pool
 
         inds = np.arange(rannum[0], rannum[1])
-        (rannum[1]-rannum[0])*2
-        nproc = 9 #try this so doesn't run out of memory
+        #(rannum[1]-rannum[0])*2
+        nproc = 18 #try 9 if runs out of memory
         with Pool(processes=nproc) as pool:
             res = pool.map(_parfun1, inds)
             pool.close()
@@ -381,7 +381,9 @@ if args.apply_veto == 'y':
         from multiprocessing import Pool
 
         inds = np.arange(rannum[0], rannum[1])
-        nproc = 9 #try this so doesn't run out of memory
+        nproc = 18 #try this so doesn't run out of memory
+        if tracer == 'QSO' or tracer == 'LRG':
+            nproc = 9 #QSO has OOM with all 18
         with Pool(processes=nproc) as pool:
             res = pool.map(_parfun2, inds)
             pool.close()
@@ -396,7 +398,7 @@ if args.mkclusdat == 'y':
     nztl.append('')
     fin = os.path.join(dirout, args.tracer + notqso + '_full' + args.use_map_veto + '.dat.fits')
     #ct.mkclusdat(os.path.join(dirout,args.tracer+notqso),tp=args.tracer,dchi2=None,tsnrcut=0,zmin=zmin,zmax=zmax)#,ntilecut=ntile)
-    ct.mkclusdat(os.path.join(dirout, args.tracer + notqso), tp = args.tracer, dchi2 = None, tsnrcut = 0, zmin = zmin, zmax = zmax, use_map_veto = args.use_map_veto)#,ntilecut=ntile,ccut=ccut)
+    ct.mkclusdat(os.path.join(dirout, args.tracer + notqso), tp = args.tracer, dchi2 = None, tsnrcut = 0, zmin = zmin, zmax = zmax, use_map_veto = args.use_map_veto,subfrac=subfrac)#,ntilecut=ntile,ccut=ccut)
     #ct.mkclusdat(os.path.join(dirout, args.tracer + notqso), tp = args.tracer, dchi2 = None, splitNS='y', tsnrcut = 0, zmin = zmin, zmax = zmax, use_map_veto = args.use_map_veto)#,ntilecut=ntile,ccut=ccut)
     print('*** END WITH MKCLUSDAT ***')
 
@@ -417,8 +419,8 @@ if args.mkclusran == 'y':
     clus_arrays = [fitsio.read(fl.replace('global','dvs_ro')+'clustering.dat.fits')]
     global _parfun4
     def _parfun4(rann):
-        ct.add_tlobs_ran(fl, rann, hpmapcut = args.use_map_veto)
-        ct.mkclusran(os.path.join(dirout, args.tracer + notqso + '_'), os.path.join(dirout, args.tracer + notqso + '_'), rann, rcols = rcols,  tsnrcut = 0, tsnrcol = tsnrcol, use_map_veto = args.use_map_veto,clus_arrays=clus_arrays)#,ntilecut=ntile,ccut=ccut)
+        #ct.add_tlobs_ran(fl, rann, hpmapcut = args.use_map_veto)
+        ct.mkclusran(os.path.join(dirout, args.tracer + notqso + '_'), os.path.join(dirout, args.tracer + notqso + '_'), rann, rcols = rcols,  tsnrcut = -1, tsnrcol = tsnrcol, use_map_veto = args.use_map_veto,clus_arrays=clus_arrays,add_tlobs='y')#,ntilecut=ntile,ccut=ccut)
         #ct.mkclusran(os.path.join(dirout, args.tracer + notqso + '_'), os.path.join(dirout, args.tracer + notqso + '_'), rann, rcols = rcols, nosplit='n', tsnrcut = 0, tsnrcol = tsnrcol, use_map_veto = args.use_map_veto)#,ntilecut=ntile,ccut=ccut)
     #for clustering, make rannum start from 0
     if args.par == 'n':
@@ -428,7 +430,7 @@ if args.mkclusran == 'y':
         from multiprocessing import Pool
 
         inds = np.arange(rannum[0], rannum[1])
-        nproc = 9 #try this so doesn't run out of memory
+        nproc = 18 #try this so doesn't run out of memory
         with Pool(processes=nproc) as pool:
             res = pool.map(_parfun4, inds)
             pool.close()
@@ -447,8 +449,8 @@ if args.nz == 'y':
     fcr = fb+'_0_clustering.ran.fits'
     fcd = fb+'_clustering.dat.fits'
     fout = fb+'_nz.txt'
-    common.mknz(fcd,fcr,fout,bs=dz_step,zmin=zmin,zmax=zmax,compmd='')
-    common.addnbar(fb,bs=dz_step,zmin=zmin,zmax=zmax,P0=P0,nran=nran,compmd='',par=args.par,nproc=nproc)
+    common.mknz(fcd,fcr,fout,bs=dz_step,zmin=zmin,zmax=zmax)
+    common.addnbar(fb,bs=dz_step,zmin=zmin,zmax=zmax,P0=P0,nran=nran,par=args.par,nproc=nproc)
 
 def splitGC(flroot,datran='.dat',rann=0):
     import LSS.common_tools as common
@@ -462,13 +464,18 @@ def splitGC(flroot,datran='.dat',rann=0):
     #c = SkyCoord(fn['RA']* u.deg,fn['DEC']* u.deg,frame='icrs')
     #gc = c.transform_to('galactic')
     sel_ngc = common.splitGC(fn)#gc.b > 0
-    outf_ngc = flroot+'NGC_'+app
+    outf_ngc = flroot.replace('/global/cfs/cdirs/desi/survey/catalogs/',os.getenv('SCRATCH')+'/')+'NGC_'+app
     common.write_LSS(fn[sel_ngc],outf_ngc)
-    outf_sgc = flroot+'SGC_'+app
+    outf_sgc = flroot.replace('/global/cfs/cdirs/desi/survey/catalogs/',os.getenv('SCRATCH')+'/')+'SGC_'+app
     common.write_LSS(fn[~sel_ngc],outf_sgc)
 
 
 if args.splitGC == 'y':
+    dirout = dirout.replace('/global/cfs/cdirs/desi/survey/catalogs/',os.getenv('SCRATCH')+'/')
+
+    if not os.path.exists(dirout):
+        os.makedirs(dirout)
+    print('made '+dirout)
     splitGC(fb+'_','.dat')
     def _spran(rann):
         splitGC(fb+'_','.ran',rann)

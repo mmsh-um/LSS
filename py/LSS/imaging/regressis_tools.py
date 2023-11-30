@@ -9,6 +9,7 @@ import logging
 import numpy as np
 import pandas as pd
 import healpy as hp
+import fitsio
 
 from regressis import PhotometricDataFrame, Regression, footprint, setup_logging
 from regressis.utils import mkdir, setup_mplstyle, read_fits_to_pandas, build_healpix_map
@@ -382,6 +383,7 @@ feature_names=None,pixmap_external=None,feature_names_ext=None,use_sgr=False,use
     """
     #logger.info(f"Collect "+survey+" data for {tracer}:")
 
+    print('in weight function')
     zcol = 'Z_not4clus'
     
     cols = ['RA','DEC',zcol,'ZWARN','FRACZ_TILELOCID','DELTACHI2','FRAC_TLOBS_TILES','WEIGHT_ZFAIL']
@@ -391,6 +393,7 @@ feature_names=None,pixmap_external=None,feature_names_ext=None,use_sgr=False,use
     #data = fitsio.read(os.path.join(LSS, f'{tracer}'+'_full.dat.fits'))
     LSS = LSS.replace('global','dvs_ro')
     data = read_fits_to_pandas(os.path.join(LSS, f'{tracer}'+'_full'+use_map_veto+'.dat.fits'),columns=cols)
+    print('read data')
     if tracer == 'QSO':
         #good redshifts are currently just the ones that should have been defined in the QSO file when merged in full
         wz = data[zcol]*0 == 0
@@ -434,7 +437,7 @@ feature_names=None,pixmap_external=None,feature_names_ext=None,use_sgr=False,use
     data = data[wz]
     wts = 1./data['FRACZ_TILELOCID'].values*1./data['FRAC_TLOBS_TILES'].values*data['WEIGHT_ZFAIL'].values
     map_data = build_healpix_map(nside, data['RA'].values, data['DEC'].values, weights=wts, in_deg2=False)
-
+    print('made data map')
     #load photometric regions:
     #north, south, des = DR9Footprint(nside, mask_lmc=False, clear_south=True, mask_around_des=False, cut_desi=False).get_imaging_surveys()
     if foot is None:
@@ -453,9 +456,10 @@ feature_names=None,pixmap_external=None,feature_names_ext=None,use_sgr=False,use
     if tracer == 'BGS_BRIGHT-21.5':
         tran = 'BGS_BRIGHT'
     for i in range(0,nran):
-        ran = read_fits_to_pandas(os.path.join(LSS, f'{tran}'+'_'+str(i)+'_full'+use_map_veto+'.ran.fits'), columns=['RA', 'DEC']) 
+        print('reading random '+str(i))
+        ran = fitsio.read(os.path.join(LSS, f'{tran}'+'_'+str(i)+'_full'+use_map_veto+'.ran.fits'), columns=['RA', 'DEC']) #read_fits_to_pandas(os.path.join(LSS, f'{tran}'+'_'+str(i)+'_full'+use_map_veto+'.ran.fits'), columns=['RA', 'DEC']) 
         ranl.append(ran)
-    randoms = pd.concat(ranl, ignore_index=True)
+    randoms = pd.DataFrame(np.concatenate(ranl))#pd.concat(ranl, ignore_index=True)
     print(len(data),len(randoms))
     # load in deg2 since we know the density of generated randoms in deg2
     map_randoms = build_healpix_map(nside, randoms['RA'].values, randoms['DEC'].values, in_deg2=True)
