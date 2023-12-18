@@ -548,5 +548,7 @@ if args.copy_files == 'y':
     subprocess.run(cmd_cp2, shell = True)
     print("Done copying")
 
+
+
 print("script time:")
 print(datetime.now() - startTime)
