@@ -29,8 +29,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--realization", help="number for the realization",default='0')
 parser.add_argument("--prog", help="dark or bright",default='dark')
 parser.add_argument("--prep", help="prepare file for fiberassign?",default='y')
+parser.add_argument("--alt_out", default = "n")
 args = parser.parse_args()
-
 
 if args.prog == 'dark':
     types = ['ELG', 'LRG', 'QSO']
@@ -43,8 +43,11 @@ inroot = '/global/cfs/cdirs/desi/survey/catalogs/'
 inmock = '/Y1/mocks/SecondGenMocks/EZmock/'
 indir = inroot+inmock
 
-outroot = os.getenv('SCRATCH')
-outdir = outroot+inmock+'/forFA/'
+if args.alt_out != 'n':
+    outdir = args.alt_out
+else:
+    outroot = os.getenv('SCRATCH')
+    outdir = outroot+inmock+'/forFA/'
 if not os.path.exists(outdir):
 	os.makedirs(outdir)
 out_file_name = outdir + 'forFA'+args.realization+'.fits'
