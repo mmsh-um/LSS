@@ -250,6 +250,9 @@ def main(mockn):
                 maps.remove('PSFDEPTH_W2')
 
         fcd_n = indir+tp+args.famd+'_NGC_clustering.dat.fits'
+        if not os.path.exists(fcd_n):
+            print(fcd_n +' not found')
+            return True
         fcd_s = indir+tp+args.famd+'_SGC_clustering.dat.fits'
         print('test test')
         dtf_n = fitsio.read(fcd_n)
@@ -265,8 +268,8 @@ def main(mockn):
         #dtf = join(dtf,full_data,keys=['TARGETID'])
         #print('after join to full',len(dtf))
         tpr = tp
-        if tp == 'BGS_BRIGHT-21.5':
-            tpr = 'BGS_BRIGHT'
+        #if tp == 'BGS_BRIGHT-21.5':
+        #    tpr = 'BGS_BRIGHT'
 
         #rf_n = indir+tpr+args.famd+'_NGC_0_clustering.ran.fits'
         #rf_s = indir+tpr+args.famd+'_SGC_0_clustering.ran.fits'
@@ -301,8 +304,13 @@ def main(mockn):
         if 'PHOTSYS' not in list(rt.dtype.names):
             rt = common.addNS(Table(rt))
 
-        mapfn_n = 'QSO_mapprops_healpix_nested_nside256_N.fits'
-        mapfn_s = 'QSO_mapprops_healpix_nested_nside256_S.fits'
+        if tp[:3] == 'BGS':
+            mapfn_n = 'BGS_BRIGHT_mapprops_healpix_nested_nside256_N.fits'
+            mapfn_s = 'BGS_BRIGHT_mapprops_healpix_nested_nside256_S.fits'
+
+        else:
+            mapfn_n = 'QSO_mapprops_healpix_nested_nside256_N.fits'
+            mapfn_s = 'QSO_mapprops_healpix_nested_nside256_S.fits'
     
         mf = {'N':fitsio.read(datadir+'hpmaps/'+mapfn_n),\
         'S':fitsio.read(datadir+'hpmaps/'+mapfn_s)}
@@ -321,9 +329,9 @@ def main(mockn):
 
         if tp == 'QSO':
             zbins = [(0.8,1.6),(1.6,2.1),(0.8,2.1)]
-            #if args.weight_col == 'WEIGHT_RF':
-            desnorm=True
-            #GCnorm = False
+            if args.weight_col == 'WEIGHT_RF':
+                desnorm=True
+                GCnorm = False
             P0 = 6000
             nbar = 0.00002
 

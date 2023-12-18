@@ -535,7 +535,7 @@ def get_comp(fb,ran_sw=''):
     print(comp_ntl)
     return comp_ntl
 
-def addnbar(fb,nran=18,bs=0.01,zmin=0.01,zmax=1.6,P0=10000,add_data=True,ran_sw='',ranmin=0,compmd='ran',par='n',nproc=9):
+def addnbar(fb,nran=18,bs=0.01,zmin=0.01,zmax=1.6,P0=10000,add_data=True,ran_sw='',ranmin=0,compmd='ran',par='n',nproc=18):
     '''
     fb is the root of the file name, including the path
     nran is the number of random files to add the nz to
@@ -560,16 +560,22 @@ def addnbar(fb,nran=18,bs=0.01,zmin=0.01,zmax=1.6,P0=10000,add_data=True,ran_sw=
             nl[ii] = nzd[zind]
     mean_comp = len(fd)/np.sum(fd['WEIGHT_COMP'])
     print('mean completeness '+str(mean_comp))
+    nont = 0
+    if 'NTILE' not in list(fd.dtype.names):
+        fd['NTILE'] = np.ones(len(fd),dtype=int)
+        print('added NTILE = 1 column because column did not exist')
+        nont = 1
     ntl = np.unique(fd['NTILE'])
-    comp_ntl = np.zeros(len(ntl))
-    weight_ntl = np.zeros(len(ntl))
+    comp_ntl = np.ones(len(ntl))
+    weight_ntl = np.ones(len(ntl))
     for i in range(0,len(ntl)):
         sel = fd['NTILE'] == ntl[i]
         mean_ntweight = np.mean(fd['WEIGHT_COMP'][sel])        
         weight_ntl[i] = mean_ntweight
         comp_ntl[i] = 1/mean_ntweight#*mean_fracobs_tiles
-    fran = fitsio.read(fb+'_0_clustering.ran.fits',columns=['NTILE','FRAC_TLOBS_TILES'])
+    
     if compmd == 'ran':
+        fran = fitsio.read(fb+'_0_clustering.ran.fits',columns=['NTILE','FRAC_TLOBS_TILES'])
         fttl = np.zeros(len(ntl))
         for i in range(0,len(ntl)): 
             sel = fran['NTILE'] == ntl[i]
@@ -622,6 +628,11 @@ def addnbar(fb,nran=18,bs=0.01,zmin=0.01,zmax=1.6,P0=10000,add_data=True,ran_sw=
         #ft['NZ'] = nl
         #ff['LSS'].insert_column('NZ',nl)
         #fd['NZ'] = nl
+        print('mean completeness '+str(mean_comp))
+        if nont == 1:
+            fd['NTILE'] = np.ones(len(fd),dtype=int)
+            print('added NTILE = 1 column because column did not exist')
+
         fd['NX'] = nl*comp_ntl[fd['NTILE']-1]
         wt = fd['WEIGHT_COMP']*fd['WEIGHT_SYS']*fd['WEIGHT_ZFAIL']
         if compmd == 'ran':
@@ -691,12 +702,13 @@ def addFKPfull(fb,nz,tp,bs=0.01,zmin=0.01,zmax=1.6,P0=10000,add_data=True,md='da
         write_LSS(fd,fb.replace('dvs_ro','global'))
     return True
 
-def join_with_fastspec(infn,fscols=['TARGETID','ABSMAG_SDSS_G','ABSMAG_SDSS_R'],inroot='/dvs_ro/cfs/cdirs/',\
+def join_with_fastspec(infn,fscols=['TARGETID','ABSMAG01_SDSS_G','ABSMAG01_SDSS_R'],inroot='/dvs_ro/cfs/cdirs/',\
 outroot='/global/cfs/cdirs/',fsver='v1.0',fsrel='dr1',specrel='iron',prog='bright'):
 
     indata = fitsio.read(inroot+infn)
     print(len(indata))
-    fsfn = '/dvs_ro/cfs/cdirs/desi/public/'+fsrel+'/vac/'+fsrel+'/fastspecfit/'+specrel+'/'+fsver+'/catalogs/fastspec-'+specrel+'-main-'+prog+'.fits'
+    #fsfn = '/dvs_ro/cfs/cdirs/desi/public/'+fsrel+'/vac/'+fsrel+'/fastspecfit/'+specrel+'/'+fsver+'/catalogs/fastspec-'+specrel+'-main-'+prog+'.fits'
+    fsfn = '/dvs_ro/cfs/cdirs/desi/spectro/fastspecfit/'+specrel+'/catalogs/fastspec-'+specrel+'-main-'+prog+'.fits'
     fastspecdata = fitsio.read(fsfn,columns=fscols)
     dcols = list(indata.dtype.names)
     indata = Table(indata)
@@ -1386,7 +1398,51 @@ def combtiles_pa_wdup(tiles, fbadir, outdir, tarf, addcols=['TARGETID', 'RA', 'D
     print('wrote ' + outf)
     return dat_comb
 
-def combtiles_assign_wdup(tiles,fbadir,outdir,tarf,addcols=['TARGETID','RSDZ','TRUEZ','ZWARN','PRIORITY'],fba=True,tp='dark'):
+def combtiles_wdup_altmtl(pa_hdu, tiles, fbadir, outf, tarf, addcols=['TARGETID', 'RA', 'DEC']):
+    s = 0
+    td = 0
+    print('size of tiles', len(tiles))
+    tl = []
+    tar_in = fitsio.read(tarf, columns=addcols)
+    tids = tar_in['TARGETID']
+    for tile in tiles['TILEID']:
+
+        fadate = return_altmtl_fba_fadate(tile)
+        ffa = os.path.join(fbadir, fadate, 'fba-'+str(tile).zfill(6)+'.fits')
+        if pa_hdu == 'FAVAIL':
+            fa = Table(fitsio.read(ffa, ext=pa_hdu))
+            sel = np.isin(fa['TARGETID'],tids)
+            fa = fa[sel] #for targets, we only want science targets
+        else:
+            tar_hdu = 'FTARGETS'
+            fa = Table(fitsio.read(ffa,ext=pa_hdu,columns=['TARGETID','LOCATION']))
+            ft = Table(fitsio.read(ffa,ext=tar_hdu,columns=['TARGETID','PRIORITY','SUBPRIORITY']))
+            sel = fa['TARGETID'] >= 0
+            fa = fa[sel]
+            lb4join = len(fa)
+            td += 1
+            fa['TILEID'] = int(tile)
+            fa = join(fa,ft,keys=['TARGETID'])
+            if len(fa) != lb4join:
+                print(tile,lb4join,len(fa))
+
+        sel = fa['TARGETID'] >= 0
+        fa = fa[sel]
+        td += 1
+        fa['TILEID'] = int(tile)
+        tl.append(fa)
+    dat_comb = vstack(tl)
+    print('size combitles for ',pa_hdu, len(dat_comb))
+    
+    dat_comb = join(dat_comb, tar_in, keys=['TARGETID'],join_type='left')
+    print(len(dat_comb))
+
+    dat_comb.write(outf, format='fits', overwrite=True)
+    print('wrote ' + outf)
+    return dat_comb
+
+
+def combtiles_assign_wdup(tiles,fbadir,outdir,tarf,addcols=['TARGETID','RSDZ','TRUEZ','ZWARN'],fba=True,tp='dark'):
 
     s = 0
     td = 0
@@ -1395,16 +1451,22 @@ def combtiles_assign_wdup(tiles,fbadir,outdir,tarf,addcols=['TARGETID','RSDZ','T
     outf = outdir+'/datcomb_'+tp+'assignwdup.fits'
     if fba:
         pa_hdu = 'FASSIGN'
+        tar_hdu = 'FTARGETS'
     tl = []
     for tile in tiles['TILEID']:
         if fba:
             ffa = fbadir+'/fba-'+str(tile).zfill(6)+'.fits'
         if os.path.isfile(ffa):
             fa = Table(fitsio.read(ffa,ext=pa_hdu,columns=['TARGETID','LOCATION']))
+            ft = Table(fitsio.read(ffa,ext=pa_hdu,columns=['TARGETID','PRIORITY','SUBPRIORITY']))
             sel = fa['TARGETID'] >= 0
             fa = fa[sel]
+            lb4join = len(fa)
             td += 1
             fa['TILEID'] = int(tile)
+            fa = join(fa,ft,keys=['TARGETID'])
+            if len(fa) != lb4join:
+                print(tile,lb4join,len(fa))
             tl.append(fa)
             print(td,len(tiles))
         else:
@@ -1437,3 +1499,10 @@ def addNS(tab):
     seln &= sel_ngc#wra
     tab['PHOTSYS'][seln] = 'N'
     return tab
+
+def return_altmtl_fba_fadate(tileid):
+    ts = str(tileid).zfill(6)
+    FAOrigName = '/global/cfs/cdirs/desi/target/fiberassign/tiles/trunk/'+ts[:3]+'/fiberassign-'+ts+'.fits.gz'
+    fhtOrig = fitsio.read_header(FAOrigName)
+    fadate = fhtOrig['RUNDATE']
+    return ''.join(fadate.split('T')[0].split('-'))

@@ -9,14 +9,14 @@ import numpy as np
 import fitsio
 import glob
 import argparse
-from astropy.table import Table,join,unique,vstack
+from astropy.table import Table,join,unique,vstack,setdiff
 from matplotlib import pyplot as plt
 from desitarget.io import read_targets_in_tiles
 from desitarget.mtl import inflate_ledger
 from desitarget import targetmask
 from desitarget.internal import sharedmem
 from desimodel.footprint import is_point_in_desi
-from desitarget import targetmask
+
 
 import LSS.main.cattools as ct
 import LSS.common_tools as common
@@ -45,6 +45,7 @@ parser.add_argument("--simName", help="base directory of AltMTL mock",default='/
 parser.add_argument("--survey", help="e.g., main (for all), DA02, any future DA",default='DA02')
 parser.add_argument("--specdata", help="mountain range for spec prod",default='himalayas')
 parser.add_argument("--combd", help="combine the data tiles together",default='n')
+parser.add_argument("--joindspec", help="combine the target and spec info together",default='n')
 parser.add_argument("--fulld", help="make the 'full' data files ",default='n')
 parser.add_argument("--fullr", help="make the random files associated with the full data files",default='n')
 parser.add_argument("--add_gtl", help="whether to get the list of good tileloc from observed data",default='y')
@@ -174,7 +175,9 @@ if args.tracer != 'dark' and args.tracer != 'bright':
 
 
 
-
+asn = None
+pa = None
+outdir = os.path.join(maindir, 'fba' + str(mocknum)).format(MOCKNUM=mocknum)
 if args.mockver == 'ab_secondgen' and args.combd == 'y':
     print('--- START COMBD ---')
     print('entering altmtl')
@@ -182,19 +185,46 @@ if args.mockver == 'ab_secondgen' and args.combd == 'y':
     ##tarf = '/dvs_ro/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/AbacusSummit/forFA%d.fits' % mocknum #os.path.join(maindir, 'forFA_Real%d.fits' % mocknum)
     fbadir = os.path.join(args.simName, 'Univ000', 'fa', 'MAIN').format(MOCKNUM = mocknum)
     #fbadir = os.path.join(args.simName, 'Univ000', 'fa', 'MAIN').format(MOCKNUM = str(mocknum).zfill(3))
-    outdir = os.path.join(maindir, 'fba' + str(mocknum)).format(MOCKNUM=mocknum)
+    
     if not os.path.exists(outdir):
         os.mkdir(outdir)
     print('entering common.combtiles_wdup_altmtl for FASSIGN')
 
-    asn = common.combtiles_wdup_altmtl('FASSIGN', tiles, fbadir, os.path.join(outdir, 'datcomb_' + pdir + 'assignwdup.fits'), tarf, addcols=['TARGETID','RSDZ','TRUEZ','ZWARN','PRIORITY'])
+    asn = common.combtiles_wdup_altmtl('FASSIGN', tiles, fbadir, os.path.join(outdir, 'datcomb_' + pdir + 'assignwdup.fits'), tarf, addcols=['TARGETID','RSDZ','TRUEZ','ZWARN'])
+    #asn = common.combtiles_assign_wdup(tiles,fbadir,outdir,tarf,addcols=['TARGETID','RSDZ','TRUEZ','ZWARN'],fba=True,tp='dark')
     #if using alt MTL that should have ZWARN_MTL, put that in here
     asn['ZWARN_MTL'] = np.copy(asn['ZWARN'])
     print('entering common.combtiles_wdup_altmtl for FAVAIL')
     pa = common.combtiles_wdup_altmtl('FAVAIL', tiles, fbadir, os.path.join(outdir, 'datcomb_' + pdir + 'wdup.fits'), tarf, addcols=['TARGETID','RA','DEC','PRIORITY_INIT','DESI_TARGET'])
 
+fcoll = os.path.join(lssdir, 'collision_'+pdir+'_mock%d.fits' % mocknum)
+if args.joindspec == 'y':
+
+    if asn is None:
+        afn = os.path.join(outdir, 'datcomb_' + pdir + 'assignwdup.fits')
+        asn = fitsio.read(afn)
+        print('loaded assignments')
+    if pa is None:
+        pafn = os.path.join(outdir, 'datcomb_' + pdir + 'wdup.fits')
+        pa = Table(fitsio.read(pafn))
+        print('loaded potential assignements')
     pa['TILELOCID'] = 10000*pa['TILEID'] + pa['LOCATION']
+    print('about to join assignments and potential assignments')
     tj = join(pa, asn, keys = ['TARGETID', 'LOCATION', 'TILEID'], join_type = 'left')
+    
+    
+    if not os.path.isfile(fcoll):
+        fin = os.path.join(args.targDir, 'mock%d' %mocknum, 'pota-' + pr + '.fits')
+        #fin = os.path.join('/dvs_ro/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/AbacusSummit','mock%d' %mocknum, 'pota-' + pr + '.fits')
+        fcoll = mocktools.create_collision_from_pota(fin, fcoll)
+    else:
+        print('collision file already exist', fcoll)
+
+    coll = Table(fitsio.read(fcoll))
+    print('length before masking collisions '+str(len(tj)))
+    tj = setdiff(tj,coll,keys=['TARGETID','LOCATION','TILEID'])
+    print('length after masking collisions '+str(len(tj)))
+
     outfs = os.path.join(lssdir, 'datcomb_' + pdir + '_tarspecwdup_zdone.fits')
     tj.write(outfs, format = 'fits', overwrite = True)
     print('wrote ' + outfs)
@@ -222,14 +252,14 @@ if args.fulld == 'y':
     dz = os.path.join(lssdir, 'datcomb_'+pdir+'_tarspecwdup_zdone.fits')
     tlf = os.path.join(lssdir, 'Alltiles_'+pdir+'_tilelocs.dat.fits')
 
-    fcoll = os.path.join(lssdir, 'collision_'+pdir+'_mock%d.fits' % mocknum)
+#    fcoll = os.path.join(lssdir, 'collision_'+pdir+'_mock%d.fits' % mocknum)
     
-    if not os.path.isfile(fcoll):
-        fin = os.path.join(args.targDir, 'mock%d' %mocknum, 'pota-' + pr + '.fits')
+#    if not os.path.isfile(fcoll):
+#        fin = os.path.join(args.targDir, 'mock%d' %mocknum, 'pota-' + pr + '.fits')
         #fin = os.path.join('/dvs_ro/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/AbacusSummit','mock%d' %mocknum, 'pota-' + pr + '.fits')
-        fcoll = mocktools.create_collision_from_pota(fin, fcoll)
-    else:
-        print('collision file already exist', fcoll)
+#        fcoll = mocktools.create_collision_from_pota(fin, fcoll)
+#    else:
+#        print('collision file already exist', fcoll)
 
     ct.mkfulldat_mock(dz, imbits, ftar, args.tracer, bit, os.path.join(dirout, args.tracer + notqso + '_full_noveto.dat.fits'), tlf, survey = args.survey, maxp = maxp, desitarg = desitarg, specver = args.specdata, notqso = notqso, gtl_all = None, mockz = mockz,  mask_coll = fcoll, badfib = mainp.badfib, min_tsnr2 = mainp.tsnrcut, mocknum = mocknum, mockassigndir = os.path.join(args.base_output, 'fba%d' % mocknum).format(MOCKNUM=mocknum))
     print('*** END WITH FULLD ***')
@@ -405,12 +435,12 @@ if args.mkclusdat == 'y':
 
     
     
-
+rcols=['Z','WEIGHT','WEIGHT_SYS','WEIGHT_COMP','WEIGHT_ZFAIL','TARGETID_DATA']
 if args.mkclusran == 'y':
     print('--- START MKCLUSRAN ---')
     if len(nztl) == 0:
         nztl.append('')
-    rcols=['Z','WEIGHT','WEIGHT_SYS','WEIGHT_COMP','WEIGHT_ZFAIL','TARGETID_DATA']
+    
     tsnrcol = 'TSNR2_ELG'
     if args.tracer[:3] == 'BGS':
         tsnrcol = 'TSNR2_BGS'
@@ -464,22 +494,24 @@ def splitGC(flroot,datran='.dat',rann=0):
     #c = SkyCoord(fn['RA']* u.deg,fn['DEC']* u.deg,frame='icrs')
     #gc = c.transform_to('galactic')
     sel_ngc = common.splitGC(fn)#gc.b > 0
-    outf_ngc = flroot.replace('/global/cfs/cdirs/desi/survey/catalogs/',os.getenv('SCRATCH')+'/')+'NGC_'+app
+    #outf_ngc = flroot.replace('/global/cfs/cdirs/desi/survey/catalogs/',os.getenv('SCRATCH')+'/')+'NGC_'+app
+    outf_ngc = flroot+'NGC_'+app
     common.write_LSS(fn[sel_ngc],outf_ngc)
-    outf_sgc = flroot.replace('/global/cfs/cdirs/desi/survey/catalogs/',os.getenv('SCRATCH')+'/')+'SGC_'+app
+    #outf_sgc = flroot.replace('/global/cfs/cdirs/desi/survey/catalogs/',os.getenv('SCRATCH')+'/')+'SGC_'+app
+    outf_sgc = flroot+'SGC_'+app
     common.write_LSS(fn[~sel_ngc],outf_sgc)
 
-
+inds = np.arange(rm,rx)
 if args.splitGC == 'y':
-    dirout = dirout.replace('/global/cfs/cdirs/desi/survey/catalogs/',os.getenv('SCRATCH')+'/')
+    #dirout = dirout.replace('/global/cfs/cdirs/desi/survey/catalogs/',os.getenv('SCRATCH')+'/')
 
-    if not os.path.exists(dirout):
-        os.makedirs(dirout)
-    print('made '+dirout)
+    #if not os.path.exists(dirout):
+    #    os.makedirs(dirout)
+    #print('made '+dirout)
     splitGC(fb+'_','.dat')
     def _spran(rann):
         splitGC(fb+'_','.ran',rann)
-    inds = np.arange(nran)
+    #inds = np.arange(nran)
     if args.par == 'y':
         from multiprocessing import Pool
         with Pool(processes=nproc) as pool:
@@ -488,6 +520,26 @@ if args.splitGC == 'y':
         for rn in inds:#range(rm,rx):
              _spran(rn)
 
+if args.resamp == 'y':
+    regions = ['NGC','SGC']        
+    for reg in regions:
+        flin = fb + '_'+reg    
+        def _parfun_re(rannum):
+            ct.clusran_resamp(flin,rannum,rcols=rcols)#,compmd=args.compmd)#, ntilecut=ntile, ccut=ccut)
+        
+        
+        if args.par == 'y':
+            from multiprocessing import Pool
+            with Pool() as pool:
+                res = pool.map(_parfun_re, inds)
+        else:
+            for rn in range(rm,rx):
+                _parfun_re(rn)
+        fcr = flin+'_0_clustering.ran.fits'
+        fcd = flin+'_clustering.dat.fits'
+        fout = flin+'_nz.txt'
+        common.mknz(fcd,fcr,fout,bs=dz_step,zmin=zmin,zmax=zmax)
+        common.addnbar(flin,bs=dz_step,zmin=zmin,zmax=zmax,P0=P0,nran=nran,par=args.par)
 
 
     

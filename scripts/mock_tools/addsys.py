@@ -51,7 +51,7 @@ parser.add_argument("--imsys_nside",help="healpix nside used for imaging systema
 parser.add_argument("--imsys_colname",help="column name for fiducial imaging systematics weight, if there is one (array of ones by default)",default=None)
 
 #AJRM 
-parser.add_argument("--mockcatver", help="catalog version",default=None)
+#parser.add_argument("--mockcatver", help="catalog version",default=None)
 parser.add_argument("--use_allsky_rands", help="if yes, use all sky randoms to get fractional area per pixel for SYSNet data preparation",default='n')
 
 args = parser.parse_args()
@@ -251,15 +251,18 @@ if args.prepsysnet == 'y':
         ranl.append(ran)
     rands = np.concatenate(ranl)
     
-    if args.use_allsky_rands == 'y':
-        print('using randoms allsky for frac_area')
-        ranl = []
-        randir = '/dvs_ro/cfs/cdirs/desi/target/catalogs/dr9/0.49.0/randoms/resolve/'
-        for i in range(0,nran):
-            print(f"reading allsky randoms {i+1}/{nran}")
-            ran = fitsio.read(randir+f'randoms-allsky-1-{i}.fits',columns=['RA','DEC','PHOTSYS'])
-            ranl.append(ran)
-        allsky_rands = np.concatenate(ranl)
+    #if args.use_allsky_rands == 'y':
+    #    print('using randoms allsky for frac_area')
+    #    allsky_fn = "/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/iron/LSScats/allsky_rpix_nran18_nside256_ring.fits"
+    #    allsky_rands = fitsio.read(allsky_fn)
+    #    allrands = allsky_rands['RANDS_HPIX'] # randoms count per hp pixel
+        #ranl = []
+        #randir = '/dvs_ro/cfs/cdirs/desi/target/catalogs/dr9/0.49.0/randoms/resolve/'
+        #for i in range(0,nran):
+        #    print(f"reading allsky randoms {i+1}/{nran}")
+        #    ran = fitsio.read(randir+f'randoms-allsky-1-{i}.fits',columns=['RA','DEC','PHOTSYS'])
+        #    ranl.append(ran)
+        #allsky_rands = np.concatenate(ranl)
         
     regl = ['N','S']
     
@@ -282,8 +285,11 @@ if args.prepsysnet == 'y':
             seld = dat['PHOTSYS'] == reg
             selr = rands['PHOTSYS'] == reg
             if args.use_allsky_rands == 'y':
-                selr_all = allsky_rands['PHOTSYS'] == reg
-                allrands = allsky_rands[selr_all]
+                allsky_fn = f"/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/iron/LSScats/allsky_rpix_{reg}_nran18_nside256_ring.fits"
+                allsky_rands = fitsio.read(allsky_fn)
+                allrands = allsky_rands['RANDS_HPIX'] # randoms count per hp pixel
+            #    selr_all = allsky_rands['PHOTSYS'] == reg
+            #    allrands = allsky_rands[selr_all]
             else:
                 allrands = None
         
@@ -368,30 +374,32 @@ if args.add_regressis == 'y':
     from regressis import PhotoWeight
     fb = dirout+tp
     regl = ['NGC','SGC']
-    for reg in regl:
-        fcd = fb+'_'+reg+'_clustering.dat.fits'
-        dd = Table.read(fcd)
-        dd['WEIGHT_RF'] = np.ones(len(dd))
+    #for reg in regl:
+    fcd = fb+'_clustering.dat.fits'
+    dd = Table.read(fcd)
+    dd['WEIGHT_RF'] = np.ones(len(dd))
 
-        for zl in zrl:    
-            print(zl)
-            zw = str(zl[0])+'_'+str(zl[1])
+    for zl in zrl:    
+        print(zl)
+        zw = str(zl[0])+'_'+str(zl[1])
 
-            fnreg = dirout+'/regressis_data/main_'+tp+zw+'_256/RF/main_'+tp+zw+'_imaging_weight_256.npy'
-            rfpw = PhotoWeight.load(fnreg)
-            #print(np.mean(rfpw))
-            #dth,dphi = densvar.radec2thphi(dd['RA'],dd['DEC'])
-            #dpix = densvar.hp.ang2pix(densvar.nside,dth,dphi,nest=densvar.nest)
-            #drfw = rfpw[dpix]
-        
-            selz = dd['Z'] > zl[0]
-            selz &= dd['Z'] <= zl[1]
-            dd['WEIGHT_RF'][selz] = rfpw(dd['RA'][selz], dd['DEC'][selz], normalize_map=True)#drfw[selz]
-            #norm = 
-            print(np.mean(dd['WEIGHT_RF'][selz]))
+        fnreg = dirout+'/regressis_data/main_'+tp+zw+'_256/RF/main_'+tp+zw+'_imaging_weight_256.npy'
+        rfpw = PhotoWeight.load(fnreg)
+        #print(np.mean(rfpw))
+        #dth,dphi = densvar.radec2thphi(dd['RA'],dd['DEC'])
+        #dpix = densvar.hp.ang2pix(densvar.nside,dth,dphi,nest=densvar.nest)
+        #drfw = rfpw[dpix]
+    
+        selz = dd['Z'] > zl[0]
+        selz &= dd['Z'] <= zl[1]
+        dd['WEIGHT_RF'][selz] = rfpw(dd['RA'][selz], dd['DEC'][selz], normalize_map=True)#drfw[selz]
+        #norm = 
+        print(np.mean(dd['WEIGHT_RF'][selz]))
     #logf.write('added RF regressis weight for '+tracer_clus+zw+'\n')
 
-        common.write_LSS(dd,fcd)#,comments)
+    common.write_LSS(dd,fcd)#,comments)
+    flroot = os.path.join(dirout, tp+'_')
+    splitGC_wo(flroot)
 
 regl = ['NGC','SGC']
 
@@ -406,45 +414,47 @@ if args.add_sysnet == 'y':
     #dd['WEIGHT_SN'] = np.ones(len(dd))
 
     regl_sysnet = ['N','S']
-    regl = ['NGC','SGC']
+    #regl = ['NGC','SGC']
     fb = dirout+tp
-    for reg in regl:
-        fcd = fb+'_'+reg+'_clustering.dat.fits'
-        dd = Table.read(fcd)
-        dd['WEIGHT_SN'] = np.ones(len(dd))
-        dth,dphi = densvar.radec2thphi(dd['RA'],dd['DEC'])
-        dpix = hp.ang2pix(256,dth,dphi)
+    #for reg in regl:
+    fcd = fb+'_clustering.dat.fits'
+    dd = Table.read(fcd)
+    dd['WEIGHT_SN'] = np.ones(len(dd))
+    dth,dphi = densvar.radec2thphi(dd['RA'],dd['DEC'])
+    dpix = hp.ang2pix(256,dth,dphi)
 
-        for reg in regl_sysnet:
-            for zl in zrl:
-                zw = ''
-                if args.imsys_zbin == 'y':
-                    zw = str(zl[0])+'_'+str(zl[1])
-                sn_weights = fitsio.read(dirout+'/sysnet/'+tp+zw+'_'+reg+'/nn-weights.fits')
-                pred_counts = np.mean(sn_weights['weight'],axis=1)
-                #pix_weight = np.mean(pred_counts)/pred_counts
-                #pix_weight = np.clip(pix_weight,0.5,2.)
-                pix_weight = 1./pred_counts
-                pix_weight = pix_weight / np.mean(pix_weight)
-                pix_weight = np.clip(pix_weight,0.5,2.)
-                print(pix_weight.min(),pix_weight.max(),pix_weight.mean())
-                sn_pix = sn_weights['hpix']
-                hpmap = np.ones(12*256*256)
-                for pix,wt in zip(sn_pix,pix_weight):
-                    hpmap[pix] = wt
-        
-                sel = dd['PHOTSYS'] == reg
-                selz = dd['Z'] > zl[0]
-                selz &= dd['Z'] <= zl[1]
+    for reg in regl_sysnet:
+        for zl in zrl:
+            zw = ''
+            if args.imsys_zbin == 'y':
+                zw = str(zl[0])+'_'+str(zl[1])
+            sn_weights = fitsio.read(dirout+'/sysnet/'+tp+zw+'_'+reg+'/nn-weights.fits')
+            pred_counts = np.mean(sn_weights['weight'],axis=1)
+            #pix_weight = np.mean(pred_counts)/pred_counts
+            #pix_weight = np.clip(pix_weight,0.5,2.)
+            pix_weight = 1./pred_counts
+            pix_weight = pix_weight / np.mean(pix_weight)
+            pix_weight = np.clip(pix_weight,0.5,2.)
+            print(pix_weight.min(),pix_weight.max(),pix_weight.mean())
+            sn_pix = sn_weights['hpix']
+            hpmap = np.ones(12*256*256)
+            for pix,wt in zip(sn_pix,pix_weight):
+                hpmap[pix] = wt
+    
+            sel = dd['PHOTSYS'] == reg
+            selz = dd['Z'] > zl[0]
+            selz &= dd['Z'] <= zl[1]
 
-                #print(np.sum(sel))
-                if len(dd[sel&selz]) > 0:
-                    dd['WEIGHT_SN'][sel&selz] = hpmap[dpix[sel&selz]]
+            #print(np.sum(sel))
+            if len(dd[sel&selz]) > 0:
+                dd['WEIGHT_SN'][sel&selz] = hpmap[dpix[sel&selz]]
         #print(np.min(dd['WEIGHT_SYS']),np.max(dd['WEIGHT_SYS']),np.std(dd['WEIGHT_SYS']))
         #comments = []
         #comments.append("Using sysnet for WEIGHT_SYS")
 
-        common.write_LSS(dd,fcd)#,comments)
+    common.write_LSS(dd,fcd)#,comments)
+    flroot = os.path.join(dirout, tp+'_')
+    splitGC_wo(flroot)
 
 if args.add_regressis_ran == 'y' or args.add_sysnet_ran == 'y' or args.add_imsys_ran == 'y':
     if args.add_regressis_ran == 'y':

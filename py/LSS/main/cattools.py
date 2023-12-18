@@ -2493,6 +2493,10 @@ def mkfulldat_mock(zf,imbits,ftar,tp,bit,outf,ftiles,maxp=3400,azf='',azfm='cumu
 
     #print('ECHO ',dz['TARGETID'][0])
     #if tp[:3] != 'QSO':
+    dz['ransort'] = np.random.random(len(dz))
+    dz.sort('ransort')
+    print('randomly sorted')
+    dz.remove_column('ransort')
     if tp[:3] == 'QSO':
         selnp = dz['LOCATION_ASSIGNED'] == 0
         pv = dz['PRIORITY'] #we will multiply by priority in order to keep priority 3400 over lya follow-up
@@ -3748,11 +3752,12 @@ def mkclusran(flin,fl,rann,rcols=['Z','WEIGHT'],zmask=False,tsnrcut=80,tsnrcol='
     if utlid:
         ffc = unique(ffc,keys=['TILELOCID'])
         print('length after cutting to unique tilelocid '+str(len(ffc)))
-    def _resamp(selregr,selregd,ffr,fcdn):
+    #def _resamp(selregr,selregd,ffr,fcdn):
+    def _resamp(rand_sel,dat_sel,ffr,fcdn):
         for col in rcols:
             ffr[col] =  np.zeros(len(ffr))
-        rand_sel = [selregr,~selregr]
-        dat_sel = [ selregd,~selregd]
+        #rand_sel = [selregr,~selregr]
+        #dat_sel = [ selregd,~selregd]
         for dsel,rsel in zip(dat_sel,rand_sel):
             inds = np.random.choice(len(fcdn[dsel]),len(ffr[rsel]))
             print(len(fcdn[dsel]),len(inds),np.max(inds))
@@ -3764,9 +3769,10 @@ def mkclusran(flin,fl,rann,rcols=['Z','WEIGHT'],zmask=False,tsnrcut=80,tsnrcol='
         for dsel,rsel in zip(dat_sel,rand_sel):
             rd = np.sum(ffr[rsel]['WEIGHT'])/np.sum(fcdn[dsel]['WEIGHT'])
             rdl.append(rd)
-        rdr = rdl[0]/rdl[1]
-        print('norm factor is '+str(rdr))
-        ffr['WEIGHT'][rand_sel[1]] *= rdr
+        for i in range(0,len(rand_sel)-1):
+            rdr = rdl[0]/rdl[i+1]
+            print('norm factor is '+str(rdr))
+            ffr['WEIGHT'][rand_sel[i+1]] *= rdr
         for dsel,rsel in zip(dat_sel,rand_sel):
             rd = np.sum(ffr[rsel]['WEIGHT'])/np.sum(fcdn[dsel]['WEIGHT'])
             print('data/random weighted ratio after resampling:'+str(rd))
@@ -3827,12 +3833,15 @@ def mkclusran(flin,fl,rann,rcols=['Z','WEIGHT'],zmask=False,tsnrcut=80,tsnrcol='
         if 'QSO' in flin:
             if 'S' in reg or reg == '':
                 des_resamp = True
-        if reg == '': #N/S resampling
+        if reg == '' and des_resamp == False: #N/S resampling
             selregr = ffcn['PHOTSYS'] ==  'N'
             selregd = fcdn['PHOTSYS'] ==  'N'
-            ffcn = _resamp(selregr,selregd,ffcn,fcdn)
+            rand_sel = [selregr,~selregr]
+            dat_sel = [ selregd,~selregd]
 
-        if des_resamp:
+            ffcn = _resamp(rand_sel,dat_sel,ffcn,fcdn)
+
+        if des_resamp and reg == '':
             print('resampling in DES region')
             from regressis import footprint
             foot = footprint.DR9Footprint(256, mask_lmc=False, clear_south=True, mask_around_des=False, cut_desi=False)
@@ -3840,10 +3849,15 @@ def mkclusran(flin,fl,rann,rcols=['Z','WEIGHT'],zmask=False,tsnrcut=80,tsnrcol='
             th_ran,phi_ran = (-ffcn['DEC']+90.)*np.pi/180.,ffcn['RA']*np.pi/180.
             th_dat,phi_dat = (-fcdn['DEC']+90.)*np.pi/180.,fcdn['RA']*np.pi/180.
             pixr = hp.ang2pix(256,th_ran,phi_ran,nest=True)
-            selregr = des[pixr]
+            selregr_des = des[pixr]
             pixd = hp.ang2pix(256,th_dat,phi_dat,nest=True)
-            selregd = des[pixd]
-            ffcn = _resamp(selregr,selregd,ffcn,fcdn)
+            selregd_des = des[pixd]
+            selregr = ffcn['PHOTSYS'] ==  'N'
+            selregd = fcdn['PHOTSYS'] ==  'N'
+            rand_sel = [selregr,selregr_des,~selregr&~selregr_des]
+            dat_sel = [ selregd,selregd_des,~selregd&~selregd_des]
+
+            ffcn = _resamp(rand_sel,dat_sel,ffcn,fcdn)
         no_resamp = False
         if reg == 'N' or (reg == 'S' and des_resamp == False):
             no_resamp = True
@@ -3973,6 +3987,7 @@ def clusran_resamp(flin,rann,rcols=['Z','WEIGHT'],write_cat='y',compmd='ran'):
 
     if 'NGC' in flin:
         #need to split N/S when sampling
+        print('doing N/S re-sampling')
         selregr = ffr['DEC'] > 32.375
         selregd = fcdn['DEC'] > 32.375
         ffr = _resamp(selregr,selregd,ffr,fcdn)
@@ -4154,7 +4169,7 @@ def clusNStoGC(flroot,nran=1):
         outf_sgc = flroot+'SGC_'+str(rann)+'_clustering.ran.fits'
         common.write_LSS(fc[~sel_ngc],outf_sgc)
    
-def splitclusGC(flroot,nran=1):
+def splitclusGC(flroot,nran=1,par='n'):
     import LSS.common_tools as common
     '''
     split full clustering catalog by Galactic cap; should already have been re-sampled N/S (and DES for QSO)
@@ -4169,8 +4184,8 @@ def splitclusGC(flroot,nran=1):
     common.write_LSS(fc[sel_ngc],outf_ngc)
     outf_sgc = flroot+'SGC_clustering.dat.fits'
     common.write_LSS(fc[~sel_ngc],outf_sgc)
+    def _ranparfun(rann):
     
-    for rann in range(0,nran):
         fc = Table(fitsio.read(flroot+str(rann)+'_clustering.ran.fits'))
         c = SkyCoord(fc['RA']* u.deg,fc['DEC']* u.deg,frame='icrs')
         gc = c.transform_to('galactic')
@@ -4179,8 +4194,15 @@ def splitclusGC(flroot,nran=1):
         common.write_LSS(fc[sel_ngc],outf_ngc)
         outf_sgc = flroot+'SGC_'+str(rann)+'_clustering.ran.fits'
         common.write_LSS(fc[~sel_ngc],outf_sgc)
-
-
+    inds = np.arange(nran)
+    if par == 'n':
+        for rann in inds:
+            _ranparfun(rann)
+    if par == 'y':
+        from multiprocessing import Pool
+        with Pool() as pool:
+            res = pool.map(_ranparfun, inds)
+    
 
 
 def random_mtl(rd,outf ):

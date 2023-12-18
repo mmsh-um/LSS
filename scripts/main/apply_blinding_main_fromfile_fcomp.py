@@ -74,6 +74,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--type", help="tracer type to be selected")
 parser.add_argument("--basedir_in", help="base directory for input, default is location for official catalogs", default='/dvs_ro/cfs/cdirs/desi/survey/catalogs/')
 parser.add_argument("--basedir_out", help="base directory for output, default is C(P)SCRATCH", default=os.environ[scratch])
+parser.add_argument("--mv_out2cfs", help="whether to move the output cfs or not", default='n')
 parser.add_argument("--version", help="catalog version", default='test')
 parser.add_argument("--survey", help="e.g., main (for all), DA02, any future DA", default='Y1')
 parser.add_argument("--verspec", help="version for redshifts", default='iron')
@@ -379,9 +380,9 @@ if root:
         inds = np.arange(args.minr,args.maxr)
         if args.useMPI == 'y':
             from multiprocessing import Pool
-            nproc = 9
+            #nproc = 9
             #nproc = nran*2
-            with Pool(processes=nproc) as pool:
+            with Pool() as pool:
                 res = pool.map(_parfun, inds)
         else:
             for ii in inds:
@@ -515,7 +516,7 @@ if root:
             
             inds = np.arange(nran)
             from multiprocessing import Pool
-            with Pool(processes=nran*2) as pool:
+            with Pool() as pool:
                 res = pool.map(_parfun, inds)
 
     
@@ -545,7 +546,7 @@ if root:
             fcd = fb+'_clustering.dat.fits'
             fout = fb+'_nz.txt'
             common.mknz(fcd,fcr,fout,bs=dz,zmin=zmin,zmax=zmax,randens=randens)
-            common.addnbar(fb,bs=dz,zmin=zmin,zmax=zmax,P0=P0,nran=nran)
+            common.addnbar(fb,bs=dz,zmin=zmin,zmax=zmax,P0=P0,nran=nran,par='y')
 
 
 
@@ -554,3 +555,8 @@ if root:
     os.system('rm '+dirout+args.type+'*_N_*')
     os.system('rm '+dirout+args.type+'*IFFT*')
     os.system('rm '+dirout+args.type+'*full*')
+    
+    if args.mv_out2cfs == 'y':
+        mvdir = '/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/iron' + '/LSScats/' + version + '/blinded/'
+        os.system('mv '+dirout+'* '+mvdir)
+        os.system('chmod 775 '+mvdir+'*')

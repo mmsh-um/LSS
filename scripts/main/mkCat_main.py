@@ -11,6 +11,11 @@ import glob
 import argparse
 from astropy.table import Table,join,unique,vstack
 from matplotlib import pyplot as plt
+
+import logging
+logger = logging.getLogger('mkCat')
+logger.setLevel(level=logging.INFO)
+
 #from desihub
 #from desitarget import targetmask
 #from regressis, must be installed
@@ -68,6 +73,7 @@ parser.add_argument("--FKPfull", help="add FKP weights to full catalogs",default
 parser.add_argument("--addnbar_ran", help="just add nbar/fkp to randoms",default='n')
 parser.add_argument("--add_ke", help="add k+e corrections for BGS data to clustering catalogs",default='n')
 parser.add_argument("--add_fs", help="add rest frame info from fastspecfit",default='n')
+parser.add_argument("--redoBGS215", help="whether to use purely photometry+z based rest frame info or fastspecfit",default='n')
 parser.add_argument("--absmagmd", help="whether to use purely photometry+z based rest frame info or fastspecfit",choices=['spec','phot'],default='spec')
 
 parser.add_argument("--blinded", help="are we running on the blinded full catalogs?",default='n')
@@ -384,17 +390,6 @@ wzm = ''
 if ccut is not None:
     wzm += ccut #you could change this to however you want the file names to turn out
 
-if type == 'BGS_BRIGHT-21.5' and args.survey == 'Y1':
-    ffull = dirout+type+notqso+'_full'+args.use_map_veto+'.dat.fits'
-    if os.path.isfile(ffull) == False:
-        logf.write('making BGS_BRIGHT-21.5 full data catalog for '+str(datetime.now()))
-        fin = fitsio.read(dirout+'BGS_BRIGHT_full'+args.use_map_veto+'.dat.fits')
-        if args.absmagmd == 'phot':
-            sel = fin['ABSMAG_RP1'] < -21.5
-        if args.absmagmd == 'spec':
-            sel = (fin['ABSMAG_SDSS_R'] +0.97*fin['Z_not4clus']-.095) < -21.5
-            #sys.exit('need to code up using fastspecfit for abs mag selection!')
-        common.write_LSS(fin[sel],ffull)
 
 tracer_clus = type+notqso+wzm
 
@@ -473,7 +468,7 @@ if type[:3] == 'BGS':
 
 
 if args.add_fs == 'y':
-    fscols=['TARGETID','ABSMAG_SDSS_G','ABSMAG_SDSS_R']
+    fscols=['TARGETID','ABSMAG01_SDSS_G','ABSMAG01_SDSS_R']
     fsver = 'v1.0'
     fsrel = 'dr1'
     fsspecver = args.verspec
@@ -553,6 +548,19 @@ if args.add_ke == 'y':
         #    dat = common.add_ke(dat,zcol='Z_not4clus')
             #if args.test == 'n':
         common.write_LSS(res,fn,comments=['added k+e corrections'])
+
+if type == 'BGS_BRIGHT-21.5' and args.survey == 'Y1':
+    ffull = dirout+type+notqso+'_full'+args.use_map_veto+'.dat.fits'
+    if os.path.isfile(ffull) == False or args.redoBGS215 == 'y':
+        logf.write('making BGS_BRIGHT-21.5 full data catalog for '+str(datetime.now()))
+        fin = fitsio.read(dirout+'BGS_BRIGHT_full'+args.use_map_veto+'.dat.fits')
+        if args.absmagmd == 'phot':
+            sel = fin['ABSMAG_RP1'] < -21.5
+        if args.absmagmd == 'spec':
+            sel = (fin['ABSMAG01_SDSS_R'] +0.97*fin['Z_not4clus']-.095) < -21.5
+            #sys.exit('need to code up using fastspecfit for abs mag selection!')
+        common.write_LSS(fin[sel],ffull)
+
     
 if args.add_bitweight == 'y':
     logf.write('added bitweights to data catalogs for '+tp+' '+str(datetime.now()))
@@ -701,19 +709,21 @@ if args.imsys == 'y':
     #regl = ['_DN','_DS','','_N','_S']
     #wzm = ''
     #fit_maps = ['STARDENS','EBV','GALDEPTH_G', 'GALDEPTH_R','GALDEPTH_Z','PSFSIZE_G','PSFSIZE_R','PSFSIZE_Z']
-    use_maps = fit_maps
+    
        
     #rcols.append('WEIGHT_SYSEB')   
     fname = os.path.join(dirout, tracer_clus+'_full'+args.use_map_veto+'.dat.fits')
     dat = Table(fitsio.read(fname))
     selgood = common.goodz_infull(tp[:3],dat)
+    selobs = dat['ZWARN'] != 999999
+    dat = dat[selgood&selobs]
     ranl = []
     for i in range(0,1):#int(args.maxr)):
         ran = fitsio.read(os.path.join(dirout, tpstr+'_'+str(i)+'_full'+args.use_map_veto+'.ran.fits'), columns=['RA', 'DEC','PHOTSYS']) 
         ranl.append(ran)
     rands = np.concatenate(ranl)
     syscol = 'WEIGHT_IMLIN'
-    regl = ['N','S']
+    regl = ['S','N']
     dat[syscol] = np.ones(len(dat))
     for reg in regl:
         pwf = lssmapdirout+tpstr+'_mapprops_healpix_nested_nside'+str(nside)+'_'+reg+'.fits'
@@ -739,7 +749,20 @@ if args.imsys == 'y':
             #dd = Table.read(fcd)
             
             print('getting weights for region '+reg+' and '+str(zmin)+'<z<'+str(zmax))
-            wsysl = densvar.get_imweight(dat,rands[selr],zmin,zmax,reg,fit_maps,use_maps,sys_tab=sys_tab,zcol='Z_not4clus',figname=dirout+tracer_clus+'_'+reg+'_'+str(zmin)+str(zmax)+'_linimsysfit.png')
+            if type == 'LRG':
+                if reg == 'N':
+                    fitmapsbin = fit_maps
+                else:
+                    if zmax == 0.6:
+                        fitmapsbin = mainp.fit_maps46s
+                    if zmax == 0.8:
+                        fitmapsbin = mainp.fit_maps68s
+                    if zmax == 1.1:
+                        fitmapsbin = mainp.fit_maps81s
+            else:
+                fitmapsbin = fit_maps
+            use_maps = fitmapsbin
+            wsysl = densvar.get_imweight(dat,rands[selr],zmin,zmax,reg,fitmapsbin,use_maps,sys_tab=sys_tab,zcol='Z_not4clus',figname=dirout+tracer_clus+'_'+reg+'_'+str(zmin)+str(zmax)+'_linimsysfit.png')
             sel = wsysl != 1
             dat[syscol][sel] = wsysl[sel]
             #dd['WEIGHT'][sel] *= wsysl[sel]
@@ -754,16 +777,17 @@ if args.prepsysnet == 'y':
 
     from LSS.imaging import sysnet_tools
     
-    allsky_rands = None
-    if args.use_allsky_rands == 'y':
-        print('using randoms allsky for frac_area')
-        ranl = []
-        randir = '/dvs_ro/cfs/cdirs/desi/target/catalogs/dr9/0.49.0/randoms/resolve/'
-        for i in range(0,18):
-            print(f"reading allsky randoms {i+1}/18")
-            ran = fitsio.read(randir+f'randoms-allsky-1-{i}.fits',columns=['RA','DEC','PHOTSYS'])
-            ranl.append(ran)
-        allsky_rands = np.concatenate(ranl)
+    #allsky_rands = None
+    #if args.use_allsky_rands == 'y':
+    #    print('using randoms allsky for frac_area')
+        #ranl = []
+        #randir = '/dvs_ro/cfs/cdirs/desi/target/catalogs/dr9/0.49.0/randoms/resolve/'
+        #for i in range(0,18):
+        #    logger.info("reading allsky randoms "+str(i))
+        #    ran = fitsio.read(randir+f'randoms-allsky-1-{i}.fits',columns=['RA','DEC','PHOTSYS'])
+        #    ranl.append(ran)
+        #allsky_rands = np.concatenate(ranl)
+        
     
     #_HPmapcut'
     dat = fitsio.read(os.path.join(dirout, tracer_clus+'_full'+args.use_map_veto+'.dat.fits'))
@@ -793,8 +817,11 @@ if args.prepsysnet == 'y':
             seld = dat['PHOTSYS'] == reg
             selr = rands['PHOTSYS'] == reg
             if args.use_allsky_rands == 'y':
-                selr_all = allsky_rands['PHOTSYS'] == reg
-                allrands = allsky_rands[selr_all]
+                allsky_fn = f"/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/iron/LSScats/allsky_rpix_{reg}_nran18_nside256_ring.fits"
+                allsky_rands = fitsio.read(allsky_fn)
+                allrands = allsky_rands['RANDS_HPIX'] # randoms count per hp pixel
+            #    selr_all = allsky_rands['PHOTSYS'] == reg
+            #    allrands = allsky_rands[selr_all]
             else:
                 allrands = None
         
@@ -1020,7 +1047,7 @@ if args.ran_utlid == 'y':
 if mkclusdat:
     ct.mkclusdat(dirout+type+notqso,tp=type,dchi2=dchi2,tsnrcut=tsnrcut,zmin=zmin,zmax=zmax,wsyscol=args.imsys_colname,use_map_veto=args.use_map_veto)#,ntilecut=ntile,ccut=ccut)
 
-
+inds = np.arange(args.minr,args.maxr)
 if mkclusran:
     print('doing clustering randoms (possibly a 2nd time to get sys columns in)')
 #     tsnrcol = 'TSNR2_ELG'
@@ -1036,13 +1063,26 @@ if mkclusran:
 #         tsnrcol = 'TSNR2_BGS'
 #         dchi2 = 40
 #         tsnrcut = 1000
+    ranin = dirin + args.type + notqso + '_'
+    if args.type == 'BGS_BRIGHT-21.5':
+        ranin = dirin + 'BGS_BRIGHT' + notqso + '_'
 
-    for ii in range(rm,rx):
-        ct.mkclusran(dirin+type+notqso+'_',dirout+tracer_clus+'_',ii,rcols=rcols,tsnrcut=tsnrcut,tsnrcol=tsnrcol,ebits=ebits,utlid=utlid,use_map_veto=args.use_map_veto)#,ntilecut=ntile,ccut=ccut)
+    clus_arrays = [fitsio.read(dirout + type + notqso+'_clustering.dat.fits')]
+    def _parfun_cr(ii):
+        ct.mkclusran(ranin,dirout+tracer_clus+'_',ii,rcols=rcols,tsnrcut=tsnrcut,tsnrcol=tsnrcol,ebits=ebits,utlid=utlid,clus_arrays=clus_arrays,use_map_veto=args.use_map_veto)
+    if args.par == 'y':
+        from multiprocessing import Pool
+        with Pool() as pool:
+            res = pool.map(_parfun_cr, inds)
+
+    else:
+        for ii in inds:#range(rm,rx):
+            _parfun_cr(ii)
+        #,ntilecut=ntile,ccut=ccut)
 
 if args.NStoGC == 'y':
     fb = dirout+tracer_clus+'_'
-    ct.clusNStoGC(fb, args.maxr - args.minr)
+    ct.clusNStoGC(fb, args.maxr - args.minr)#,par=args.par)
 
 
 if type == 'QSO':
@@ -1066,6 +1106,39 @@ if type[:3] == 'BGS':
 nran = args.maxr-args.minr
 regions = ['NGC', 'SGC']
 
+def splitGC(flroot,datran='.dat',rann=0):
+    import LSS.common_tools as common
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    app = 'clustering'+datran+'.fits'
+    if datran == '.ran':
+        app = str(rann)+'_clustering'+datran+'.fits'
+
+    fn = Table(fitsio.read(flroot.replace('global','dvs_ro') +app))
+    sel_ngc = common.splitGC(fn)#gc.b > 0
+    outf_ngc = flroot+'NGC_'+app
+    common.write_LSS(fn[sel_ngc],outf_ngc)
+    outf_sgc = flroot+'SGC_'+app
+    common.write_LSS(fn[~sel_ngc],outf_sgc)
+
+
+if args.splitGC == 'y':
+    fb = dirout+tracer_clus+'_'
+   # ct.splitclusGC(fb, args.maxr - args.minr,par=args.par)   
+    splitGC(fb,'.dat')
+    def _spran(rann):
+        splitGC(fb,'.ran',rann)
+    inds = np.arange(nran)
+    if args.par == 'y':
+        from multiprocessing import Pool
+        with Pool() as pool:
+            res = pool.map(_spran, inds)
+    else:
+        for rn in inds:#range(rm,rx):
+             _spran(rn)
+
+
+
 if args.resamp == 'y':
             
     for reg in regions:
@@ -1073,10 +1146,10 @@ if args.resamp == 'y':
         def _parfun(rannum):
             ct.clusran_resamp(flin,rannum,rcols=rcols)#,compmd=args.compmd)#, ntilecut=ntile, ccut=ccut)
         
-        inds = np.arange(nran)
+        
         if args.par == 'y':
             from multiprocessing import Pool
-            with Pool(processes=nran*2) as pool:
+            with Pool() as pool:
                 res = pool.map(_parfun, inds)
         else:
             for rn in range(rm,rx):
@@ -1085,17 +1158,14 @@ if args.resamp == 'y':
 #allreg = ['N','S','NGC', 'SGC']
 #allreg = ['NGC','SGC']
 if args.nz == 'y':
-    #for reg in allreg:
-	fb = dirout+tracer_clus#+'_'+reg
-	fcr = fb+'_0_clustering.ran.fits'
-	fcd = fb+'_clustering.dat.fits'
-	fout = fb+'_nz.txt'
-	common.mknz(fcd,fcr,fout,bs=dz,zmin=zmin,zmax=zmax)
-	common.addnbar(fb,bs=dz,zmin=zmin,zmax=zmax,P0=P0,nran=nran)
+    for reg in regions:#allreg:
+        fb = dirout+tracer_clus+'_'+reg
+        fcr = fb+'_0_clustering.ran.fits'
+        fcd = fb+'_clustering.dat.fits'
+        fout = fb+'_nz.txt'
+        common.mknz(fcd,fcr,fout,bs=dz,zmin=zmin,zmax=zmax)
+        common.addnbar(fb,bs=dz,zmin=zmin,zmax=zmax,P0=P0,nran=nran,par=args.par)
 
-if args.splitGC == 'y':
-    fb = dirout+tracer_clus+'_'
-    ct.splitclusGC(fb, args.maxr - args.minr)   
     
 
 #if args.nz == 'y':
