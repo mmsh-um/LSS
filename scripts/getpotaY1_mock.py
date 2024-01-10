@@ -1,9 +1,7 @@
 '''
 Find all potential assignment and counts tiles for Y1 mocks
 Use the following environment
-source $CFS/desi/software/desi_environment.sh main
-module swap desimodel/0.19.0
-module swap fiberassign/5.7.2
+source /global/common/software/desi/desi_environment.sh main
 '''
 
 import numpy as np
@@ -43,6 +41,7 @@ log = Logger.get()
 parser = argparse.ArgumentParser()
 parser.add_argument("--prog", choices=['DARK','BRIGHT'],default='DARK')
 parser.add_argument("--mock", default='ab2ndgen')
+parser.add_argument("--mock_version",default='')
 parser.add_argument("--realization")
 parser.add_argument("--getcoll",default='y')
 parser.add_argument("--base_output", help="base directory for output",default='/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/')
@@ -59,16 +58,18 @@ parser.add_argument("--nprocs", help="Number of multiprocessing processes to use
 desi_input_dir = os.getenv('DESI_ROOT_READONLY', default='/dvs_ro/cfs/cdirs/desi')
 
 args = parser.parse_args()
+print(args)
+
 if args.mock == 'ab2ndgen':
     #infn = args.base_output+'FirstGenMocks/AbacusSummit/forFA'+args.realization+'_matched_input_full_masknobs.fits'
     #infn = args.base_output+'SecondGenMocks/AbacusSummit/forFA'+args.realization+'.fits'
-    infn = os.path.join(args.base_input+'SecondGenMocks', 'AbacusSummit', 'forFA'+args.realization+'.fits')
+    infn = os.path.join(args.base_output+'SecondGenMocks', 'AbacusSummit'+args.mock_version, 'forFA'+args.realization+'.fits')
     log.info('Reading %s' % infn)
     tars = fitsio.read(infn)
     tarcols = list(tars.dtype.names)
     #tileoutdir = args.base_output+'SecondGenMocks/AbacusSummit/tartiles'+args.realization+'/'
     tileoutdir = os.path.join(os.getenv('SCRATCH'), 'SecondGenMocks', 'AbacusSummit', 'tartiles'+args.realization)
-    paoutdir = os.path.join(args.base_output+'SecondGenMocks', 'AbacusSummit', 'mock'+args.realization)
+    paoutdir = os.path.join(args.base_output+'SecondGenMocks', 'AbacusSummit'+args.mock_version, 'mock'+args.realization)
 elif args.mock == 'ezmocks6':
     # #tr = args.tracer
     # rz = args.realization

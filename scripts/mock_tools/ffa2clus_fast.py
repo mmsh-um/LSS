@@ -84,7 +84,7 @@ mapcuts = mainp.mapcuts
 #    bittest = targetmask.desi_mask
 #    desitarg='DESI_TARGET'
 if args.tracer == 'all':
-    tracers = ['LRG','ELG_LOP','QSO']
+    tracers = ['QSO','ELG_LOP','LRG']
     #if args.mockver == 'EZmock/FFA':
     #    tracers = ['ELG','QSO','LRG']
 else:
@@ -224,27 +224,38 @@ for tracer in tracers:
     out_data_froot = outdir+tracer+'_ffa_'
     
     subfrac = 1
+    zsplit = None
     if tracer == 'LRG':
         zmin = 0.4
         zmax = 1.1
-        subfrac = 0.958 #fudge factor to get number density correct
+        if args.mockver == 'AbacusSummit':
+            subfrac = 0.958 #fudge factor to get number density correct
         if args.mockver == 'EZmock/FFA':
             subfrac = 0.96
 
     elif (tracer == 'ELG_LOP') or (tracer == 'ELG'):
         zmin = 0.8
         zmax = 1.6
-        subfrac = .785 #determined from ration of clustering catalogs; SGC 0.77 NGC 0.793
+        if args.mockver == 'AbacusSummit':
+            subfrac = .785 #determined from ration of clustering catalogs; SGC 0.77 NGC 0.793
         if args.mockver == 'EZmock/FFA':
             subfrac1 = .72
             subfrac2 = .54
+            zsplit = 1.5
+        
+        if args.mockver == 'AbacusSummit_v3':
+            subfrac1 = .8
+            subfrac2 = .63
             zsplit = 1.5
 
     elif tracer == 'QSO':
         zmin = 0.8
         zmax = 2.1
-        subfrac = 0.62 #determined from ratio of data with 0.8 < z < 2.1 to mock using subfrac = 1
+        if args.mockver == 'AbacusSummit':
+            subfrac = 0.62 #determined from ratio of data with 0.8 < z < 2.1 to mock using subfrac = 1
         if args.mockver == 'EZmock/FFA':
+            subfrac = 0.66
+        if args.mockver == 'AbacusSummit_v3':
             subfrac = 0.66
     elif tracer == 'BGS_BRIGHT-21.5':
         zmin = 0.1
@@ -286,7 +297,7 @@ for tracer in tracers:
         mock_data_tr = mock_data_tr[selz]
         print('length after cutting to redshift range',len(mock_data_tr))
         sub_array = np.random.random(len(mock_data_tr))
-        if args.mockver == 'EZmock/FFA' and tracer == 'ELG_LOP':
+        if zsplit is not None:
             subfrac = np.ones(len(mock_data_tr))
             selzsub = mock_data_tr['Z'] < zsplit
             subfrac[selzsub] = subfrac1

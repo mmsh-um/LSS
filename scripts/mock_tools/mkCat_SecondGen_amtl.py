@@ -42,8 +42,8 @@ parser.add_argument("--base_output", help="base directory for output",default=os
 parser.add_argument("--outmd", help="whether to write in scratch",default='scratch')
 parser.add_argument("--targDir", help="base directory for target file",default=None)
 parser.add_argument("--simName", help="base directory of AltMTL mock",default='/pscratch/sd/a/acarnero/SecondGen/altmtl_main_rea{MOCKNUM}')
-parser.add_argument("--survey", help="e.g., main (for all), DA02, any future DA",default='DA02')
-parser.add_argument("--specdata", help="mountain range for spec prod",default='himalayas')
+parser.add_argument("--survey", help="e.g., main (for all), DA02, any future DA",default='Y1')
+parser.add_argument("--specdata", help="mountain range for spec prod",default='iron')
 parser.add_argument("--combd", help="combine the data tiles together",default='n')
 parser.add_argument("--joindspec", help="combine the target and spec info together",default='n')
 parser.add_argument("--fulld", help="make the 'full' data files ",default='n')
@@ -58,6 +58,8 @@ parser.add_argument("--mkclusdat", help="make the data clustering files; these a
 parser.add_argument("--apply_map_veto", help="apply vetos to data and randoms based on values in healpix maps",default='n')
 parser.add_argument("--mkclusran_allpot", help="make the random clustering files; these are cut to a small subset of columns",default='n')
 parser.add_argument("--mkclusdat_allpot", help="make the data clustering files; these are cut to a small subset of columns",default='n')
+
+parser.add_argument("--start_from_full",help="whether to start from the full catalogs already moved the the final directory",default='n')
 
 parser.add_argument("--mkclusran_tiles", help="make the random clustering files; these are cut to a small subset of columns",default='n')
 parser.add_argument("--mkclusdat_tiles", help="make the data clustering files; these are cut to a small subset of columns",default='n')
@@ -157,6 +159,7 @@ if not os.path.exists(lssdir):
     print('made '+lssdir)
 
 dirout = os.path.join(lssdir, 'LSScats')
+dirfinal = dirout
 if args.outmd == 'scratch':
     dirout = dirout.replace('/global/cfs/cdirs/desi/survey/catalogs/',os.getenv('SCRATCH')+'/')
 
@@ -271,12 +274,12 @@ zmax = 3.5
 P0 = 6000
 dz_step = 0.02
 
+zsplit = None
 subfrac = 1
 if tracer == 'QSO':
     zmin = 0.8
     zmax = 2.1
-    subfrac = 0.62 #determined from ratio of data with 0.8 < z < 2.1 to mock using subfrac = 1
-
+    subfrac = 0.66 #determined from ratio of data with 0.8 < z < 2.1 to mock using subfrac = 1 for altmtl version 3_1
 
 if args.tracer[:3] == 'LRG':# or notqso == 'notqso':
 #        maxp = 3200
@@ -284,14 +287,15 @@ if args.tracer[:3] == 'LRG':# or notqso == 'notqso':
     dz_step = 0.01
     zmin = 0.4
     zmax = 1.1
-    subfrac = 0.945
+    subfrac = 0.976
 if args.tracer[:3] == 'ELG':
     P0 = 4000
     dz_step = 0.01
 #        maxp = 3000
     zmin = 0.8
     zmax = 1.6
-    subfrac = 0.676
+    subfrac = [0.69,0.54]#0.676
+    zsplit=1.5
 if args.tracer[:3] == 'BGS':
     P0 = 7000
     dz_step = 0.01
@@ -421,14 +425,18 @@ if args.apply_veto == 'y':
     print('*** END VETO ***')
     #print('random veto '+str(ii)+' done')
 
+readdir = dirout
+if args.start_from_full == 'y':
+	readdir = dirfinal
+
 
 nztl = []
 if args.mkclusdat == 'y':
     print('--- START MKCLUSDAT ---')
     nztl.append('')
-    fin = os.path.join(dirout, args.tracer + notqso + '_full' + args.use_map_veto + '.dat.fits')
+    #fin = os.path.join(dirout, args.tracer + notqso + '_full' + args.use_map_veto + '.dat.fits')
     #ct.mkclusdat(os.path.join(dirout,args.tracer+notqso),tp=args.tracer,dchi2=None,tsnrcut=0,zmin=zmin,zmax=zmax)#,ntilecut=ntile)
-    ct.mkclusdat(os.path.join(dirout, args.tracer + notqso), tp = args.tracer, dchi2 = None, tsnrcut = 0, zmin = zmin, zmax = zmax, use_map_veto = args.use_map_veto,subfrac=subfrac)#,ntilecut=ntile,ccut=ccut)
+    ct.mkclusdat(os.path.join(readdir, args.tracer + notqso), tp = args.tracer, dchi2 = None, tsnrcut = 0, zmin = zmin, zmax = zmax, use_map_veto = args.use_map_veto,subfrac=subfrac,zsplit=zsplit)#,ntilecut=ntile,ccut=ccut)
     #ct.mkclusdat(os.path.join(dirout, args.tracer + notqso), tp = args.tracer, dchi2 = None, splitNS='y', tsnrcut = 0, zmin = zmin, zmax = zmax, use_map_veto = args.use_map_veto)#,ntilecut=ntile,ccut=ccut)
     print('*** END WITH MKCLUSDAT ***')
 
@@ -450,7 +458,7 @@ if args.mkclusran == 'y':
     global _parfun4
     def _parfun4(rann):
         #ct.add_tlobs_ran(fl, rann, hpmapcut = args.use_map_veto)
-        ct.mkclusran(os.path.join(dirout, args.tracer + notqso + '_'), os.path.join(dirout, args.tracer + notqso + '_'), rann, rcols = rcols,  tsnrcut = -1, tsnrcol = tsnrcol, use_map_veto = args.use_map_veto,clus_arrays=clus_arrays,add_tlobs='y')#,ntilecut=ntile,ccut=ccut)
+        ct.mkclusran(os.path.join(readdir, args.tracer + notqso + '_'), os.path.join(dirout, args.tracer + notqso + '_'), rann, rcols = rcols,  tsnrcut = -1, tsnrcol = tsnrcol, use_map_veto = args.use_map_veto,clus_arrays=clus_arrays,add_tlobs='y')#,ntilecut=ntile,ccut=ccut)
         #ct.mkclusran(os.path.join(dirout, args.tracer + notqso + '_'), os.path.join(dirout, args.tracer + notqso + '_'), rann, rcols = rcols, nosplit='n', tsnrcut = 0, tsnrcol = tsnrcol, use_map_veto = args.use_map_veto)#,ntilecut=ntile,ccut=ccut)
     #for clustering, make rannum start from 0
     if args.par == 'n':
