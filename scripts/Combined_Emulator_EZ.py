@@ -15,7 +15,6 @@ import LSS.common_tools as ct
 
 startTime = datetime.now()
 #python /global/homes/s/sikandar/Combined_Emulator.py -mockver ab_secondgen_cosmosim --real 1 --prog bright --base_output /global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/AbacusSummitBGS/ --tracer BGS --emulator_dir /global/cfs/cdirs/desi/survey/catalogs/main/mocks/FAemu_preliminary/sikandar/Updated_Code_CFC/ --galcap B
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--mockver", help="type of mock to use",default=None)
 parser.add_argument("--mockpath", help="Location of mock file(s)",default='/global/cfs/cdirs/desi/cosmosim/FirstGenMocks/AbacusSummit/CutSky/')
@@ -79,7 +78,7 @@ print(cmd_string2)
 print(cmd_string3)
 print(cmd_string4)
 if args.prep == 'y':
-    subprocess.run(cmd_string1, shell = True)
+    #subprocess.run(cmd_string1, shell = True)
     print("Done with prepare_mocks_y1")
     subprocess.run(cmd_string2, shell = True)
     print("Done with getpotaY1_mock")

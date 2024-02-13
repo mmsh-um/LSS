@@ -113,11 +113,12 @@ for tr in args.tracer:
     elif tr == "QSO":
         intable_tr = intable[intable["DESI_TARGET"]==4]
     elif tr == "BGS":
-        intable_tr = intable[intable["DESI_TARGET"]==2**60]
+        intable_tr = intable[intable["DESI_TARGET"]==1152921504606846976]
     #intable_tr.write(out_dir + '/comb' + prog_small + '_wdupspec_zdone_' + tr + '.fits', overwrite = True)
 
         
     print('counting tiles for ', tr)
+    print('length of intable_tr = ', len(intable_tr))
 
     t2 = datetime.now()
     tc = ct.count_tiles_better('mock',pd = tr, gtl=gtl, indir = out_dir, prog_ = args.prog.lower())

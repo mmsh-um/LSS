@@ -60,7 +60,7 @@ print(cmd_string4)
 if args.prep == 'y':
     #subprocess.run(cmd_string1, shell = True)
     print("Done with prepare_mocks_y1")
-    #subprocess.run(cmd_string2, shell = True)
+    subprocess.run(cmd_string2, shell = True)
     print("Done with getpotaY1_mock")
     subprocess.run(cmd_string3, shell = True)
     print("done with NTILE_assign")

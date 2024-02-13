@@ -21,8 +21,8 @@ parser.add_argument("--mockver", help="type of mock to use",default=None)
 parser.add_argument("--mockpath", help="Location of mock file(s)",default='/global/cfs/cdirs/desi/cosmosim/FirstGenMocks/AbacusSummit/CutSky/')
 parser.add_argument("--mockfile", help="formattable name of mock file(s). e.g. cutsky_{TYPE}_{Z}_AbacusSummit_base_c000_ph{PH}.fits. TYPE will be replaced with tracer type. PH will be replaced with realization number for simulation of mock.",default='cutsky_{TYPE}_{Z}_AbacusSummit_base_c000_ph{PH}.fits')
 parser.add_argument("--real", help="number for the realization",default=0)
-parser.add_argument("--prog", help="dark or bright",default='dark')
-parser.add_argument("--base_output", help="base directory for output", default = "/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA/FFA_temp/")#default='/pscratch/sd/s/sikandar/Y1/mocks/')
+parser.add_argument("--prog", help="dark or bright",default='bright')
+parser.add_argument("--base_output", help="base directory for output", default = "/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA_BGS/FFA_temp/")#default='/pscratch/sd/s/sikandar/Y1/mocks/')
 parser.add_argument("--tracer", help="which tracer to do", nargs = '+')
 parser.add_argument("--emulator_dir", help="base directory of ffa emulator")
 parser.add_argument("--galcap")
@@ -34,6 +34,7 @@ parser.add_argument("--foflinklen", default = '0.02')
 parser.add_argument("--emubeta0", default = '0.7')
 parser.add_argument("--emubeta1", default = '0.')
 parser.add_argument("--adj_qref", default = 'n')
+parser.add_argument("--downsample_bgs", default = 'n')
 #parser.add_argument("--deco", help = "anticorrelation parameter for emulator", default = 0.1)
 args = parser.parse_args()
 tracer_arr = np.array(args.tracer)
@@ -44,8 +45,11 @@ tracer_string = " ".join(tracer_arr)
 #     add_string = ""
 add_string = ""
 
-if args.mockver == "EZmock":
+if (args.mockver == "EZmock") and ("BGS" not in args.tracer):
     prep_script = "/global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1EZ.py"
+    subdir = "EZmock"
+elif (args.mockver == "EZmock") and ("BGS" in args.tracer):
+    prep_script = "/global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1.py"
     subdir = "EZmock"
 else:
     prep_script = "/global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1.py"
@@ -65,7 +69,7 @@ DESIwemu_indir = args.base_output + add_string + "SecondGenMocks/" + subdir +"/"
 DESIwemu_outdir = args.emulator_dir + "fof_v1.0/in/"
 #cmd_string1 = "python /global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1.py --rbandcut 19.5 --mockver %s --prog %s --downsampling n --overwrite 1 --realmin %s --realmax %s --base_output %s" %(args.mockver, args.prog.lower(), args.real, int(args.real) + 1, args.base_output)
 if args.mockver == "EZmock":
-    cmd_string1 = "python %s --realization %s --prog %s --alt_out %s"%(prep_script, args.real, args.prog.lower(), "/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA/FFA_temp/SecondGenMocks/EZmock/forFA/")
+    cmd_string1 = "python %s --mockver %s --realmin %s --realmax %s --prog %s --base_output %s --downsampling n"%(prep_script, args.mockver, args.real, int(args.real) + 1, args.prog.lower(), "/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA_BGS/FFA_temp/SecondGenMocks/EZmock/forFA/")
 else:
     cmd_string1 = "python %s --rbandcut 19.5 --mockver %s --prog %s --downsampling n --overwrite 1 --realmin %s --realmax %s --base_output %s" %(prep_script, args.mockver, args.prog.lower(), args.real, int(args.real) + 1, args.base_output)
 cmd_string2 = "python /global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/getpotaY1_mock.py --base_output %s --prog %s --realization %s --base_input %s --mock %s --tile-temp-dir %s"%(getpota_indir, args.prog.upper(), args.real, getpota_outdir, args.mockver,getpota_tiledir)
@@ -73,7 +77,7 @@ cmd_string3 = "python /global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_to
 
 cmd_string4 = {}
 for i in range(len(tracer_arr)):
-    cmd_string4[tracer_arr[i]] = "python %sDESIAbacuswemu.py --mocknumber %s --tracer %s --basedir %s --prog %s --overwrite y --outdir %s --mocktype %s"%(args.emulator_dir, args.real, tracer_arr[i], DESIwemu_indir, args.prog.upper(),DESIwemu_outdir, args.mockver)
+    cmd_string4[tracer_arr[i]] = "python %sDESI_wemu.py --mocknumber %s --tracer %s --basedir %s --prog %s --overwrite y --outdir %s --mocktype %s"%(args.emulator_dir, args.real, tracer_arr[i], DESIwemu_indir, args.prog.upper(),DESIwemu_outdir, args.mockver)
 #     if i==0:
 #         cmd_string4[tracer_arr[i]] = "python %sDESIAbacuswemu.py --mocknumber %s --tracer %s --basedir %s --prog %s --overwrite y --outdir %s --mocktype %s"%(args.emulator_dir, args.real, tracer_arr[i], DESIwemu_indir, args.prog.upper(),DESIwemu_outdir, args.mockver)
 #     else: 
@@ -152,6 +156,8 @@ for tr_i in tracer_arr:
             lines[i] = f"fof_dir '{emulator_basedir + 'fof_v1.0/'}'\n"
         elif lines[i].startswith("linklen"):
             lines[i] = f"linklen    {args.foflinklen + 'd0'}\n"
+        elif lines[i].startswith("mocknum"):
+            lines[i] = f"mocknum     {args.real}\n"
 
     file_path_new_fof = emulator_basedir + "fof_v1.0/INI_fof_lightcone_ang_%s_m%s_ll_%s.txt"%(args.mockver, args.real, args.foflinklen)
     # Write the modified content back to the same file
@@ -210,6 +216,8 @@ for tr_i in tracer_arr:
                 lines[i] = f"adj_qref_lg        {'T'}\n"
             else:
                 lines[i] = f"adj_qref_lg        {'F'}\n"
+        elif lines[i].startswith("mocknum"):
+            lines[i] = f"mocknum     {args.real}\n"
         
 
 
@@ -232,7 +240,7 @@ for tr_i in tracer_arr:
         print(cmd_string5)
         print(cmd_string6)
         with open(outputfn, "w+") as output, open(errorfn, "w+") as errorf:
-             subprocess.run(cmd_string5, shell=True)
+             #subprocess.run(cmd_string5, shell=True)
              subprocess.run(cmd_string6, shell=True, stdout=output, stderr = errorf)
         print("done fof")
 
@@ -245,7 +253,7 @@ for tr_i in tracer_arr:
         print(cmd_string7)
         print(cmd_string8)
         with open(outputfnemu, "w+") as output, open(errorfnemu, "w+") as errorf:
-             subprocess.run(cmd_string7, shell=True)
+             #subprocess.run(cmd_string7, shell=True)
              subprocess.run(cmd_string8, shell=True, stdout=output, stderr = errorf)
         print("done emulation")
 
@@ -536,10 +544,19 @@ for tr_i in tracer_arr:
         unreduced = Table.read(unred_path + '/pota-' + args.prog.upper() + '_joined_unreduced_%s.fits'%new_target)
         emu_in.remove_columns(['RA', 'DEC', 'RSDZ', 'TRUEZ', 'NTILE'])
         cat_join = join(unreduced, emu_in, keys = 'TARGETID', join_type='left')
-        outdir_data = unred_path + "ffa_full_" + target_write_name + "_ll_" + args.foflinklen + "_beta" + args.emubeta1 + ".fits"
+        #outdir_data = unred_path + "ffa_full_" + target_write_name + "_ll_" + args.foflinklen + "_beta" + args.emubeta1 + ".fits"
+        outdir_data = unred_path + "ffa_full_" + target_write_name + ".fits"
         join_red = cat_join[np.unique(cat_join["TARGETID"], return_index=True)[1]]
         join_red = ct.addNS(join_red)
-        join_red.filled().write(outdir_data, overwrite = True)
+
+        if args.downsample_bgs == 'n':
+            join_red.filled().write(outdir_data, overwrite = True)
+        elif args.downsample_bgs == 'y':
+            print("Downsampling before writing")
+            bgsfull = join_red.filled()
+            bgsbright = Table.read("/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/iron/LSScats/v1/BGS_BRIGHT-21.5_full_HPmapcut.dat.fits")
+            sel_fraction = np.random.choice(bgsfull, size = int(1.5*len(bgsbright)), replace = False) 
+            Table(sel_fraction).write(outdir_data, overwrite = True)
 
         print("Done with the emulation process for ", new_target)
 
@@ -559,11 +576,12 @@ if args.clear_files == 'y':
     print("Done removing")
 
 if args.copy_files == 'y':
-    cmd_cp1 = "cp -r -f /global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA/FFA_temp/SecondGenMocks/EZmock/mock%s /global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA/"%args.real
-    cmd_cp2 = "cp -r -f /global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA/FFA_temp/SecondGenMocks/EZmock/forFA/forFA%s.fits /global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA/forFA/"%args.real
+    cmd_cp1 = "cp -r -f /global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA_BGS/FFA_temp/SecondGenMocks/EZmock/mock%s /global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA_BGS/"%args.real
+    cmd_cp2 = "cp -r -f /global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA_BGS/FFA_temp/SecondGenMocks/EZmock/forFA/forFA%s.fits /global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA/forFA/"%args.real
     subprocess.run(cmd_cp1, shell = True)
     subprocess.run(cmd_cp2, shell = True)
     print("Done copying")
+
 
 
 

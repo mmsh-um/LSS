@@ -66,7 +66,6 @@ parser.add_argument("--isProduction", help="Say yes if you want to save in main 
 parser.add_argument("--overwrite", help="Overwrite. if it is in production, this always will be no. You must delete by hand first", default=0, type=bool)
 parser.add_argument("--rbandcut", help = "bgs bright cut", type=float)
 args = parser.parse_args()
-
 tiletab = Table.read('/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/tiles-{PROG}.fits'.format(PROG = args.prog.upper()))
 
 if args.prog == 'dark':
@@ -133,8 +132,13 @@ for real in range(args.realmin, args.realmax):
             file_name = 'cutsky_{TYPE}_{Z}_AbacusSummit_base_c000_ph{PH}.fits'
             mockdir = os.path.join(args.base_output, 'SecondGenMocks', 'AbacusSummit')
             out_file_name = os.path.join(mockdir, 'forFA{real}.fits'.format(real=real))
-
-
+        
+        elif args.mockver == 'EZmock':
+            mockpath = '/global/cfs/cdirs/desicollab/cosmosim/SecondGenMocks/EZmock/CutSky_2Gpc/'
+            file_name_NGC = 'EZmock_{TYPE}_{Z}_AbacusSummit_base_c000_ph000_NGC_{PH}.fits.gz'
+            file_name_SGC = 'EZmock_{TYPE}_{Z}_AbacusSummit_base_c000_ph000_SGC_{PH}.fits.gz'
+            mockdir = os.path.join(args.base_output)
+            out_file_name = os.path.join(mockdir, 'forFA{real}.fits'.format(real=real))
 
         else:
             raise ValueError(args.mockver+' not supported with legacy mockver argument. Use mockpath/mockfilename arguments instead.')
@@ -175,6 +179,27 @@ for real in range(args.realmin, args.realmax):
             print("Length after rbandcut")
             print(len(data))
 
+        if args.mockver == 'EZmock':
+            thepath = os.path.join(mockpath, type_, zs[type_], "NGC",file_name_NGC.format(TYPE = type_, Z = zs[type_], PH = "%04d" % real))
+            print('thepath')
+            print(thepath)
+            dataNGC = Table.read(thepath)
+            print("Length NGC")
+            print(len(dataNGC))
+            thepath = os.path.join(mockpath, type_, zs[type_], "SGC",file_name_SGC.format(TYPE = type_, Z = zs[type_], PH = "%04d" % real))
+            print('thepath')
+            print(thepath)
+            dataSGC = Table.read(thepath)
+            print("Length SGC")
+            print(len(dataSGC))
+            dataNGC["GALCAP"] = "N"
+            dataSGC["GALCAP"] = "S"
+            data = vstack([dataNGC, dataSGC])
+            print("Length of data:")
+            print(len(data))
+            print(data)
+
+
 
         elif args.mockver == 'ezmocks6':
             path_ezmock = os.path.join(mockpath, type_, zs[type_])
@@ -202,7 +227,7 @@ for real in range(args.realmin, args.realmax):
         elif args.prog == 'bright':
             idx = np.arange(len(data))
 
-        if args.mockver == 'ab_secondgen' or args.mockver == 'ab_secondgen_cosmosim':
+        if args.mockver == 'ab_secondgen' or args.mockver == 'ab_secondgen_cosmosim' or args.mockver == 'EZmock':
 
             mask_main = mask_secondgen(nz=1, foot='Y1')
             if args.prog == 'dark':
