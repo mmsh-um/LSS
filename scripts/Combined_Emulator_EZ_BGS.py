@@ -46,13 +46,13 @@ tracer_string = " ".join(tracer_arr)
 add_string = ""
 
 if (args.mockver == "EZmock") and ("BGS" not in args.tracer):
-    prep_script = "/global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1EZ.py"
+    prep_script = "/global/common/software/desi/users/sikandar/LSS/scripts/mock_tools/prepare_mocks_Y1EZ.py"
     subdir = "EZmock"
 elif (args.mockver == "EZmock") and ("BGS" in args.tracer):
-    prep_script = "/global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1.py"
+    prep_script = "/global/common/software/desi/users/sikandar/LSS/scripts/mock_tools/prepare_mocks_Y1.py"
     subdir = "EZmock"
 else:
-    prep_script = "/global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1.py"
+    prep_script = "/global/common/software/desi/users/sikandar/LSS/scripts/mock_tools/prepare_mocks_Y1.py"
     subdir = "AbacusSummit"
 
 
@@ -72,8 +72,8 @@ if args.mockver == "EZmock":
     cmd_string1 = "python %s --mockver %s --realmin %s --realmax %s --prog %s --base_output %s --downsampling n"%(prep_script, args.mockver, args.real, int(args.real) + 1, args.prog.lower(), "/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/EZmock/FFA_BGS/FFA_temp/SecondGenMocks/EZmock/forFA/")
 else:
     cmd_string1 = "python %s --rbandcut 19.5 --mockver %s --prog %s --downsampling n --overwrite 1 --realmin %s --realmax %s --base_output %s" %(prep_script, args.mockver, args.prog.lower(), args.real, int(args.real) + 1, args.base_output)
-cmd_string2 = "python /global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/getpotaY1_mock.py --base_output %s --prog %s --realization %s --base_input %s --mock %s --tile-temp-dir %s"%(getpota_indir, args.prog.upper(), args.real, getpota_outdir, args.mockver,getpota_tiledir)
-cmd_string3 = "python /global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/NTILE_assign.py --indir %s --tracer %s --tileloc_add y --prog %s"%(NTILE_assign_indir, tracer_string, args.prog.upper())
+cmd_string2 = "python /global/common/software/desi/users/sikandar/LSS/scripts/getpotaY1_mock.py --base_output %s --prog %s --realization %s --base_input %s --mock %s --tile-temp-dir %s"%(getpota_indir, args.prog.upper(), args.real, getpota_outdir, args.mockver,getpota_tiledir)
+cmd_string3 = "python /global/common/software/desi/users/sikandar/LSS/scripts/mock_tools/NTILE_assign.py --indir %s --tracer %s --tileloc_add y --prog %s"%(NTILE_assign_indir, tracer_string, args.prog.upper())
 
 cmd_string4 = {}
 for i in range(len(tracer_arr)):
