@@ -244,6 +244,9 @@ def get_clustering_positions_weights(catalog, distance, zlim=(0., np.inf),maglim
         weights /= catalog['WEIGHT_COMP'][mask]
         print('dividing weights by WEIGHT_COMP')
         weights = _format_bitweights(catalog['BITWEIGHTS'][mask]) + [weights]
+        # wlist = _format_bitweights(catalog['BITWEIGHTS'][mask])
+        # wlistT = [list(row) for row in zip(*wlist)]
+        # weights = wlistT + [weights]
 
     if name == 'randoms':
         #if 'default' in weight_type:
@@ -290,7 +293,7 @@ def read_clustering_positions_weights(distance, zlim =(0., np.inf), maglim=None,
             for reg in region:
                 cat_fns = catalog_fn(ctype='clustering', name=name, region=reg, **kwargs)
                 if name=='data':
-                    cat_full = catalog_fn(ctype='full_HPmapcut', name=name, **kwargs)
+                    cat_full = catalog_fn(ctype='full', name=name, **kwargs)
 #                    cat_full = catalog_fn(ctype='full', name=name, **kwargs)
                 logger.info('Loading {}.'.format(cat_fns))
                 isscalar = not isinstance(cat_fns, (tuple, list))
@@ -382,7 +385,7 @@ def read_full_positions_weights(name='data', weight_type='default', fibered=Fals
     def read_positions_weights(name):
         positions, weights = [], []
         for reg in region:
-            cat_fn = catalog_fn(ctype='full_HPmapcut', name=name, **kwargs)
+            cat_fn = catalog_fn(ctype='full', name=name, **kwargs)
             #cat_fn = catalog_fn(ctype='full', name=name, **kwargs)
             logger.info('Loading {}.'.format(cat_fn))
             if isinstance(cat_fn, (tuple, list)):
