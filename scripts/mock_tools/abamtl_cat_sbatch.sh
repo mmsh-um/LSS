@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 #SBATCH --qos=regular
 #SBATCH --nodes=1
 #SBATCH --constraint=cpu
@@ -9,4 +9,4 @@
 source /global/common/software/desi/users/adematti/cosmodesi_environment.sh main
 PYTHONPATH=$PYTHONPATH:$HOME/LSS/py
 
-srun scripts/mock_tools/run1_AMTLmock_LSS.sh $SLURM_ARRAY_TASK_ID
+srun /pscratch/sd/a/acarnero/codes/LSS/scripts/mock_tools/run1_AMTLmock_LSS_v4.sh $SLURM_ARRAY_TASK_ID

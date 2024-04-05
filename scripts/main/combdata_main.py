@@ -52,6 +52,7 @@ parser.add_argument("--mkemlin",help="whether or not to make emission line files
 parser.add_argument("--dospec",help="whether or not to combine spec data",default='y')
 parser.add_argument("--dotarspec",help="whether or not to combine spec and tar data per type, for non-daily data",default='y')
 parser.add_argument("--redospec",help="whether or not to combine spec data from beginning",default='n')
+parser.add_argument("--redo_zmtl",help="whether or not to remake zmtl file",default='n')
 parser.add_argument("--counts_only",help="skip to just counting overlaps",default='n')
 parser.add_argument("--combpix",help="if n, just skip to next stage",default='y')
 parser.add_argument("--get_petalsky",help="if y, combine info across tiles to get dispersion in sky fibers",default='n')
@@ -370,8 +371,8 @@ if specrel == 'daily' and args.dospec == 'y' and args.survey == 'main':
     
     if prog == 'dark':
         if args.tracer == 'all':
-            tps = ['LRG','ELG','QSO','ELG_LOP','ELG_LOP']
-            notqsos = ['','','','','notqso']
+            tps = ['QSO','LRG','ELG_LOP','ELG_LOP','ELG'] #order is not least to most memory intensive
+            notqsos = ['','','notqso','','']
         else:
             tps = [args.tracer]
             notqsos = [args.notqso]    
@@ -545,11 +546,11 @@ if specrel == 'daily' and args.dospec == 'y' and args.survey == 'main':
             #tj.write(outfs,format='fits', overwrite=True)
             print('joined to spec data and wrote out to '+outfs)
 
-        #if uptileloc:
-        #    print('counting tiles')
-        #    tc = ct.count_tiles_better('dat',tp+notqso,specrel=specrel) 
-        #    print('writing tile counts')
-        #    tc.write(outtc,format='fits', overwrite=True)
+        if uptileloc:
+            print('counting tiles')
+            tc = ct.count_tiles_better('dat',tp+notqso,specrel=specrel) 
+            print('writing tile counts')
+            tc.write(outtc,format='fits', overwrite=True)
 
 
 if args.get_petalsky == 'y':
@@ -568,7 +569,8 @@ if specrel != 'daily' and args.dospec == 'y':
     'TSNR2_ELG_R','TSNR2_LYA_R','TSNR2_BGS_R','TSNR2_QSO_R','TSNR2_LRG_R','TSNR2_ELG_Z','TSNR2_LYA_Z','TSNR2_BGS_Z',\
     'TSNR2_QSO_Z','TSNR2_LRG_Z','TSNR2_ELG','TSNR2_LYA','TSNR2_BGS','TSNR2_QSO','TSNR2_LRG','PRIORITY','DESI_TARGET','BGS_TARGET','TARGET_RA','TARGET_DEC','LASTNIGHT'])
     specfo = ldirspec+'datcomb_'+prog+'_zmtl_zdone.fits'
-    ct.combtile_spec(tiles4comb,specfo,md='zmtl',specver=specrel)
+    if args.redo_zmtl == 'y':
+        ct.combtile_spec(tiles4comb,specfo,md='zmtl',specver=specrel)
     fzmtl = fitsio.read(specfo)
     specf = join(specf,fzmtl,keys=['TARGETID','TILEID'])
     outfs = ldirspec+'datcomb_'+prog+'_spec_zdone.fits'

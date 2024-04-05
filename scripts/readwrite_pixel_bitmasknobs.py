@@ -28,7 +28,8 @@ parser.add_argument('--random_tracer', default = 'LRG', required = False)
 parser.add_argument('--mock_number', default = 0, required = False)
 parser.add_argument('--outdir', default = '', required=False )
 parser.add_argument('--overwrite', default = 'n', required=False )
-parser.add_argument('--n_processes', default = 32, required=False ,type=int)
+parser.add_argument('--test', default = 'n', required=False )
+parser.add_argument('--n_processes', default = 128, required=False ,type=int)
 
 args = parser.parse_args()
 
@@ -42,8 +43,8 @@ if args.cat_type == 'abacus':
     if args.do_randoms == 'n':
         fa_num = args.abacus_fa_num
         str_fa_num = str(fa_num)
-        input_dir = "/global/cfs/cdirs/desi/survey/catalogs/main/mocks/FirstGenMocks/AbacusSummit/"
-        input_path = '/global/cfs/cdirs/desi/survey/catalogs/main/mocks/FirstGenMocks/AbacusSummit/forFA' + str_fa_num + '.fits'
+        input_dir = "/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/AbacusSummit_v4_1/"
+        input_path = '/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/SecondGenMocks/AbacusSummit_v4_1/forFA' + str_fa_num + '.fits'
         if args.outdir != '':
             output_path = args.outdir + "/" + "forFA" + str_fa_num + "_matched_input_full_masknobs.fits"
         elif args.outdir == '':
@@ -68,10 +69,13 @@ bitmask_dir = '/global/cfs/cdirs/cosmo/data/legacysurvey/dr9/'
 
 # input_path = '/global/cfs/cdirs/desi/target/catalogs/dr9/0.49.0/randoms/resolve/randoms-1-0.fits'
 # output_path = '/global/cscratch1/sd/rongpu/temp/randoms-1-0-lrgmask_v1.fits'
-
+fe = False
 if os.path.isfile(output_path):
-    if args.overwrite == 'n':
+    fe = True
+    if args.overwrite == 'n' and args.test == 'n':
         raise ValueError(output_path+' already exists!')
+    if args.overwrite == 'n' and args.test == 'y':
+        print('will run and get timing, but no output will be written (because path exists)')
     if args.overwrite == 'y':
         print('will overwrite '+output_path)
 
@@ -183,7 +187,10 @@ res.sort('idx')
 res.remove_column('idx')
 
 #if output_path.endswith('.fits'):
-res.write(output_path,overwrite=True)
+#ow = False
+if fe == False or args.overwrite == 'y':
+    #ow = True
+    res.write(output_path,overwrite=True)
 #else:
 #    np.write(output_path, np.array(res['masknobs']))
 

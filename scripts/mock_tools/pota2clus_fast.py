@@ -63,7 +63,7 @@ parser.add_argument("--data_dir",help="where to find the data randoms",default='
 parser.add_argument("--specdata_dir",help="where to find the spec data ",default='/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/iron/')
 parser.add_argument("--minr", help="minimum number for random files",default=0,type=int)
 parser.add_argument("--maxr", help="maximum for random files, default is all 18)",default=18,type=int) 
-parser.add_argument("--mockver", default='AbacusSummit_v3', help = "which mocks to use")
+parser.add_argument("--mockver", default='AbacusSummit_v3_1', help = "which mocks to use")
 parser.add_argument("--mockcatver", default=None, help = "if not None, gets added to the output path")
 
 parser.add_argument("--tracer", default = 'all')
@@ -98,7 +98,7 @@ mapcuts = mainp.mapcuts
 
 
 if args.tracer == 'all':
-    tracers = ['LRG','ELG_LOP','QSO']
+    tracers = ['QSO','LRG','ELG_LOP']
 else:
     tracers = [args.tracer]
 
@@ -130,7 +130,7 @@ def ran_col_assign(randoms,data,sample_columns,tracer):
     data.rename_column('TARGETID', 'TARGETID_DATA')
     def _resamp(selregr,selregd):
         for col in sample_columns:
-            randoms[col] =  np.zeros(len(randoms))
+            randoms[col] =  np.zeros_like(data[col],shape=len(randoms))
         rand_sel = [selregr,~selregr]
         dat_sel = [ selregd,~selregd]
         for dsel,rsel in zip(dat_sel,rand_sel):
@@ -234,6 +234,8 @@ cols = ['LOCATION',
 'MASKBITS','ZWARN',
 'COLLISION',
 'TILEID']
+if args.prog == 'BRIGHT':
+    cols.append('R_MAG_ABS')
 mock_data = fitsio.read(in_data_fn,columns=cols)
 selcoll = mock_data['COLLISION'] == False
 mock_data = mock_data[selcoll]
@@ -267,19 +269,21 @@ mock_data.rename_column('RSDZ', 'Z')
 
     
 for tracer in tracers:
-
     mainp = main(tracer,'iron','Y1')
-    bit = bittest[tracer]#targetmask.desi_mask[tracer]
-    seltar = mock_data[desitarg] & bit > 0
-    mock_data_tr = mock_data[seltar]
-    lmockdat_noveto = len(mock_data_tr)
-    logger.info('length before/after cut to target type '+tracer+' using bit '+str(bit)+' and column '+desitarg)
-    logger.info(str(ndattot)+','+str(len(mock_data_tr)))
-
+    if args.prog == 'DARK':
+        
+        bit = bittest[tracer]#targetmask.desi_mask[tracer]
+        seltar = mock_data[desitarg] & bit > 0
+        mock_data_tr = mock_data[seltar]
+        lmockdat_noveto = len(mock_data_tr)
+        logger.info('length before/after cut to target type '+tracer+' using bit '+str(bit)+' and column '+desitarg)
+        logger.info(str(ndattot)+','+str(len(mock_data_tr)))
+    else:
+        mock_data_tr = mock_data
    
     tracerd = tracer
-    if tracer == 'BGS_BRIGHT-21.5':
-        tracerd = 'BGS'
+    #if tracer == 'BGS_BRIGHT-21.5':
+    #    tracerd = 'BGS'
 
     out_data_fn = outdir+tracerd+'_complete_clustering.dat.fits'
     out_data_froot = outdir+tracerd+'_complete_'

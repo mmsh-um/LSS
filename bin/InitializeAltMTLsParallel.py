@@ -6,7 +6,22 @@ import multiprocessing as mp
 from multiprocessing import Pool
 import logging
 import atexit
-import desitarget.io as io
+
+#TEMP
+#MODULE_PATH = '/global/homes/a/acarnero/.local/lib/python3.10/site-packages/desitarget/__init__.py'
+#MODULE_NAME = 'desitarget'
+#import importlib
+#import sys
+#spec = importlib.util.spec_from_file_location(MODULE_NAME, MODULE_PATH)
+#module = importlib.util.module_from_spec(spec)
+#sys.modules[spec.name] = module
+#spec.loader.exec_module(module)
+#
+
+import desitarget
+#from desitarget import io
+
+#import desitarget.io as io
 import glob
 from LSS.SV3.altmtltools import initializeAlternateMTLs
 import numpy as np
@@ -148,11 +163,20 @@ def procFunc(nproc):
         log.info('non sv survey')
         mtlprestr = ''
 
-    if os.path.exists(outputMTLDir + '/{0}/{2}/{3}mtl-{2}-hp-{1}.ecsv'.format(args.survey.lower(),HPList[-1], args.obscon.lower(), mtlprestr)):
+    if args.usetmp:
+        finalDir = args.finalDir.format(nproc)
+    else:
+        #TEST THIS
+        finalDir = outputMTLDir.format(nproc)
+
+    if os.path.exists(finalDir + '/{0}/{2}/{3}mtl-{2}-hp-{1}.ecsv'.format(args.survey.lower(),HPList[-1], args.obscon.lower(), mtlprestr)):
         log.info('Alt MTL for last HP in list exists. Exiting script')
         log.info(outputMTLDir + '/{0}/{2}/{3}mtl-{2}-hp-{1}.ecsv'.format(args.survey.lower(),HPList[-1], args.obscon.lower(), mtlprestr))
         return 42
     for hpnum in HPList:
+        if os.path.exists(finalDir + '/{0}/{2}/{3}mtl-{2}-hp-{1}.ecsv'.format(args.survey.lower(),hpnum, args.obscon.lower(), mtlprestr)) and (not args.overwrite):
+            log.info('Alt MTL for HP {0:d} already exists. Set -ow or --overwrite to force regeneration. '.format(hpnum))
+            continue
         log.info('hpnum = {0}'.format(hpnum))
         exampleLedger = args.exampleLedgerBase + '/{0}/{2}/{3}mtl-{2}-hp-{1}.ecsv'.format(args.survey.lower(),hpnum, args.obscon.lower(), mtlprestr)
         log.info('exampleLedger = {0}'.format(exampleLedger))

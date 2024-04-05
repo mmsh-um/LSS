@@ -50,6 +50,7 @@ parser.add_argument("--base_input", help="base directory for input for EZ mocks 
 parser.add_argument("--tile-temp-dir", help="Directory for temp tile files, default %(default)s",
                     default=os.path.join(os.environ['SCRATCH'], 'rantiles'))
 parser.add_argument("--counttiles", default = 'n')
+parser.add_argument("--secgen_ver", default = None)
 parser.add_argument("--nprocs", help="Number of multiprocessing processes to use, default %(default)i",
                     default=multiprocessing.cpu_count()//2, type=int)
 
@@ -301,7 +302,7 @@ def parse_datetime(s):
     try:
         return datetime.strptime(s, "%Y-%m-%dT%H:%M:%S%z")
     except ValueError:
-        d = datetime.strptime(rundate, "%Y-%m-%dT%H:%M:%S")
+        d = datetime.strptime(s, "%Y-%m-%dT%H:%M:%S")
         # msg = "Requested run date '{}' is not timezone-aware.  Assuming UTC.".format(runtime)
         d = d.replace(tzinfo=timezone.utc)
 

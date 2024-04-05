@@ -32,7 +32,7 @@ def fit_cons(dl,el,minv=0,step=0.01):
     
     return oldcost,c
 
-def get_tsnr2z(tracer='ELG',night=20230128,expid=165078,tsnrdir='/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/TSNR2z/'):
+def get_tsnr2z(tracer='ELG',night=20230128,expid=165078,tsnrdir='/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/TSNR2z/',dz=0.001):
     '''
     get the relative template signal to noise ^2 for a given tracer type, night, and expid
     Copied from script from Julien Guy
@@ -119,7 +119,7 @@ def get_tsnr2z(tracer='ELG',night=20230128,expid=165078,tsnrdir='/global/cfs/cdi
         dflux = tflux-smooth_flux
 
         # compute tsnr2 on a redshift range
-        redshift=np.linspace(0,1.7,int(1.700001/0.001)+1)
+        redshift=np.linspace(0,1.7,int(1.700001/dz)+1)
         tsnr2=np.zeros(redshift.shape)
         for i,z in enumerate(redshift):
             tmp=np.interp(wave,twave*(1+z)/(1+zref),dflux)
@@ -172,6 +172,19 @@ class model_ssr_zfac:
         self.maxz = maxz
         
         self.res_mod_slp = self.get_slpfunc()
+        fo = open(outdir+outfn_root+'slp_wzfac.txt','w')
+        fo.write(str(self.res_mod_slp))
+        fo = open(outdir+outfn_root+'slp_vszfac.txt','w')
+        for i in range(0,len(self.slpl)):
+            fo.write(str(self.zfacl[i])+' '+str(self.slpl[i])+'\n')
+        fo.close()
+
+        #fo.write('#a b c chi2\n')
+        #for par in pars:
+        #   fo.write(str(par)+' ')
+        #fo.write(str(chi2)+'\n')
+        fo.close()
+
         self.ssrtot = len(self.cat[self.selgz])/len(self.cat)
         self.tracer = tracer
             
@@ -202,6 +215,8 @@ class model_ssr_zfac:
             res = normed_linfit(self.cat,seltot,sel)
             slpl.append(res[0])
             zfacl.append(np.median(self.relzfac[sel]))
+        self.slpl = slpl
+        self.zfacl = zfacl
         res = np.polyfit(zfacl,slpl,1)
         return res
 

@@ -5,7 +5,7 @@ import numpy as np
 import os
 import argparse
 import sys
-
+import json
 from desitarget.targetmask import obsconditions
 from desimodel.footprint import is_point_in_desi
 
@@ -15,6 +15,33 @@ from LSS.main.cattools import count_tiles_better
 from LSS.globals import main
 from datetime import datetime
 startTime = datetime.now()
+
+
+def create_dir(value):
+    if not os.path.exists(value):
+        try:
+            os.makedirs(value, 0o755)
+            print('Check directories', value)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+
+def mask_firstgen(main=0, nz=0, Y5=0, sv3=0):
+    return main * (2**3) + sv3 * (2**2) + Y5 * (2**1) + nz * (2**0)
+
+def mask_secondgen(nz=0, foot=None, nz_lop=0):
+    if foot == 'Y1':
+        Y5 = 0
+        Y1 = 1
+    elif foot == 'Y5':
+        Y5 = 1
+        Y1 = 0
+    else:
+        Y5 = 0
+        Y1 = 0
+    return nz * (2**0) + Y5 * (2**1) + nz_lop * (2**2) + Y1 * (2**3)
+
+
 
 
 def create_dir(value):
@@ -61,10 +88,19 @@ parser.add_argument("--realmax", help="number for the realization",default=1,typ
 parser.add_argument("--prog", help="dark or bright",default='dark')
 parser.add_argument("--base_output", help="base directory for output",default='/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/')
 parser.add_argument("--apply_mask", help="apply the same mask as applied to desi targets?",default='y')
+<<<<<<< HEAD
 parser.add_argument("--downsampling", help="downsample to Y1 target density in SecondGen Abacus mocks?",default='y')
 parser.add_argument("--isProduction", help="Say yes if you want to save in main production directory",default='n')
 parser.add_argument("--overwrite", help="Overwrite. if it is in production, this always will be no. You must delete by hand first", default=0, type=bool)
 parser.add_argument("--rbandcut", help = "bgs bright cut", type=float)
+=======
+parser.add_argument("--downsampling", help="downsample to Y1 target density in SecondGen Abacus mocks?",default='n')
+parser.add_argument("--isProduction", help="Say yes if you want to save in main production directory",default='n')
+parser.add_argument("--overwrite", help="Overwrite. if it is in production, this always will be no. You must delete by hand first", default=0, type=bool)
+parser.add_argument("--split_snapshot", help="apply different snapshots to different redshift ranges?",default='n')
+parser.add_argument("--new_version", help="If production, and this is a new version, set to name, for example, AbacusSummit_v3",default=None)
+
+>>>>>>> main
 args = parser.parse_args()
 tiletab = Table.read('/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/tiles-{PROG}.fits'.format(PROG = args.prog.upper()))
 
@@ -74,6 +110,7 @@ if args.prog == 'dark':
     mainp = main(tp = 'QSO', specver = 'iron')
     desitar = {'ELG':34, 'LRG':1, 'QSO':4}
     numobs = {'ELG':2, 'LRG':2, 'QSO':4}
+<<<<<<< HEAD
     zs = {'ELG':'z1.100','LRG':'z0.800','QSO':'z1.400'}
     
     if args.mockver == 'ab_secondgen':
@@ -88,11 +125,31 @@ if args.prog == 'bright':
     desitar = {'BGS': 2**60}
     zs = {'BGS': 'z0.200'}
     numobs = {'BGS': 2}
+=======
+    
+    if args.split_snapshot == 'y':
+        zs = {'ELG':{'z0.950':[0.,1.1], 'z1.325':[1.1,99.]}, 'LRG':{'z0.500':[0.,0.6], 'z0.800':[0.6,99.]}, 'QSO':{'z1.400':[0.,99.]}}
+    else:
+        zs = {'ELG':'z1.100', 'LRG':'z0.800', 'QSO':'z1.400'}
+
+    
+    if args.mockver == 'ab_secondgen':
+        desitar = {'ELG':2**1, 'LRG':2**0, 'QSO':2**2}
+        downsampling = {'ELG':0.7345658717688022, 'LRG':0.708798313382828, 'QSO':0.39728966594530174}
+        percentage_elg_hip = 0.1
+>>>>>>> main
 
 
 if args.isProduction == 'y':
     args.base_output = '/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks'
     args.overwrite = False
+<<<<<<< HEAD
+=======
+    if args.new_version is not None:
+        Abacus_dir = args.new_version
+    else:
+        'AbacusSummit'
+>>>>>>> main
 else:
     if args.base_output == '/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks' or args.base_output == '/global/cfs/cdirs/desi/survey/catalogs/Y1/mocks/':
         args.base_output = scratch
@@ -118,6 +175,7 @@ for real in range(args.realmin, args.realmax):
             out_file_name = os.path.join(mockdir, 'EZMocks_6Gpc_{real}.fits'.format(real=real))
 
         elif args.mockver == 'ab_secondgen':
+<<<<<<< HEAD
             if args.isProduction == 'y':
                 mockpath = '/global/cfs/cdirs/desi/cosmosim/SecondGenMocks/AbacusSummit/CutSky/'
             else:
@@ -139,6 +197,21 @@ for real in range(args.realmin, args.realmax):
             file_name_SGC = 'EZmock_{TYPE}_{Z}_AbacusSummit_base_c000_ph000_SGC_{PH}.fits.gz'
             mockdir = os.path.join(args.base_output)
             out_file_name = os.path.join(mockdir, 'forFA{real}.fits'.format(real=real))
+=======
+            mockpath = args.mockpath
+            file_name = 'cutsky_{TYPE}_{Z}_AbacusSummit_base_c000_ph{PH}.fits'
+            
+            mockdir = os.path.join(args.base_output, 'SecondGenMocks', Abacus_dir)
+            #if args.split_snapshot == 'y':
+            create_dir(mockdir)
+            if not os.path.isfile(os.path.join(mockdir, 'prepare_mock_arguments.txt')):
+                with open(os.path.join(mockdir, 'prepare_mock_arguments.txt'), 'w') as f:
+                    json.dump(args.__dict__, f, indent=2)
+
+            out_file_name = os.path.join(mockdir, 'forFA{real}.fits'.format(real=real))
+            #else:
+            #    out_file_name = os.path.join(mockdir, 'forFA{real}.fits'.format(real=real))
+>>>>>>> main
 
         else:
             raise ValueError(args.mockver+' not supported with legacy mockver argument. Use mockpath/mockfilename arguments instead.')
@@ -162,6 +235,7 @@ for real in range(args.realmin, args.realmax):
     datat = []
     for type_ in types:
         if args.mockver == 'ab_firstgen' or args.mockver == 'ab_secondgen':
+<<<<<<< HEAD
             thepath = os.path.join(mockpath, type_, zs[type_], file_name.format(TYPE = type_, Z = zs[type_], PH = "%03d" % real))
             print('thepath')
             print(thepath)
@@ -201,6 +275,26 @@ for real in range(args.realmin, args.realmax):
 
 
 
+=======
+            if args.split_snapshot == 'y':
+                datas = []
+
+                for bins in zs[type_]:
+                    print(bins)
+                    thepath = os.path.join(mockpath, type_, bins, file_name.format(TYPE = type_, Z = bins, PH = "%03d" % real))
+                    print('thepath')
+                    print(thepath)
+                    dat = fitsio.read(thepath, columns=['RA','DEC','Z','Z_COSMO','STATUS'])#f[1].data
+                    mask = (dat['Z']>= zs[type_][bins][0])&(dat['Z']< zs[type_][bins][1])
+                    datas.append(Table(dat[mask]))
+                data = vstack(datas)
+                del datas
+                del dat
+            else:
+                thepath = os.path.join(mockpath, type_, zs[type_], file_name.format(TYPE = type_, Z = zs[type_], PH = "%03d" % real))
+                data = fitsio.read(thepath, columns=['RA','DEC','Z','Z_COSMO','STATUS'])#f[1].data
+        
+>>>>>>> main
         elif args.mockver == 'ezmocks6':
             path_ezmock = os.path.join(mockpath, type_, zs[type_])
             if  type_ == "LRG":
@@ -221,6 +315,7 @@ for real in range(args.realmin, args.realmax):
 
         print(data.dtype.names)
         print(type_, len(data))
+<<<<<<< HEAD
         if args.prog == 'dark':
             status = data['STATUS'][()]
             idx = np.arange(len(status))
@@ -242,6 +337,21 @@ for real in range(args.realmin, args.realmax):
                     ran_tot = np.random.uniform(size = len(idx_main))
                     idx_main = idx_main[(ran_tot<=downsampling[type_])]
 
+=======
+        status = data['STATUS'][()]
+        idx = np.arange(len(status))
+
+        if args.mockver == 'ab_secondgen':
+
+            mask_main = mask_secondgen(nz=1, foot='Y1')
+            idx_main = idx[(status & (mask_main))==mask_main]
+
+            if type_ == 'LRG' or type_ == 'QSO':
+                if args.downsampling == 'y':
+                    ran_tot = np.random.uniform(size = len(idx_main))
+                    idx_main = idx_main[(ran_tot<=downsampling[type_])]
+                data = data[idx_main]
+>>>>>>> main
                 data = Table(data)
                 
                 data['DESI_TARGET'] = desitar[type_]
@@ -267,7 +377,11 @@ for real in range(args.realmin, args.realmax):
 
                 data_lop = Table(data[idx_LOP])
                 data_vlo = Table(data[idx_VLO])
+<<<<<<< HEAD
 
+=======
+                
+>>>>>>> main
                 df_lop=data_lop.to_pandas()
                 df_vlo=data_vlo.to_pandas()
                 num_HIP_LOP = int(len(df_lop) * percentage_elg_hip)
@@ -315,10 +429,14 @@ for real in range(args.realmin, args.realmax):
             mask_main = mask_firstgen(main=0, nz=1, Y5=0, sv3=0) #no longer cutting to Y5 footprint because it doesn't actually cover Y1
             if type_ == 'LRG':
                 mask_main = mask_firstgen(main=1, nz=1, Y5=0, sv3=0)
+<<<<<<< HEAD
             if args.prog == 'dark':
                 idx_main = idx[(status & (mask_main))==mask_main]
             # else:
             #     idx_main = idx[mask_main == mask_main]
+=======
+            idx_main = idx[(status & (mask_main))==mask_main]
+>>>>>>> main
             data = data[idx_main]
             
             print(len(data))
@@ -330,7 +448,11 @@ for real in range(args.realmin, args.realmax):
             data['NUMOBS_INIT'] = numobs[type_]
 
             datat.append(data)
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> main
     targets = vstack(datat)
     del datat
     if args.mockver != 'ab_secondgen':
@@ -350,6 +472,7 @@ for real in range(args.realmin, args.realmax):
         targets = common.cutphotmask(targets, bits=mainp.imbits)
         
 
+<<<<<<< HEAD
 
     n=len(targets)
     targets.rename_column('Z_COSMO', 'TRUEZ') 
@@ -367,6 +490,25 @@ for real in range(args.realmin, args.realmax):
     targets['TARGETID'] = np.arange(1,n+1)
 
     targets.write(out_file_name, overwrite = args.overwrite)
+=======
+
+    n=len(targets)
+    targets.rename_column('Z_COSMO', 'TRUEZ') 
+    targets.rename_column('Z', 'RSDZ') 
+    targets['BGS_TARGET'] = np.zeros(n, dtype='i8')
+    targets['MWS_TARGET'] = np.zeros(n, dtype='i8')
+    targets['SUBPRIORITY'] = np.random.uniform(0, 1, n)
+    targets['BRICKNAME'] = np.full(n, '000p0000')    #- required !?!
+    targets['OBSCONDITIONS'] = obsconditions.mask(args.prog.upper()) #np.zeros(n, dtype='i8')+int(3) 
+    targets['SCND_TARGET'] = np.zeros(n, dtype='i8')+int(0)
+    targets['ZWARN'] = np.zeros(n, dtype='i8')+int(0)
+    targets['TARGETID'] = np.arange(1,n+1)
+
+    targets.write(out_file_name, overwrite = args.overwrite)
+
+    fits.setval(out_file_name, 'EXTNAME', value='TARGETS', ext=1)
+    fits.setval(out_file_name, 'OBSCON', value=args.prog.upper(), ext=1)
+>>>>>>> main
 
     fits.setval(out_file_name, 'EXTNAME', value='TARGETS', ext=1)
     fits.setval(out_file_name, 'OBSCON', value=args.prog.upper(), ext=1)

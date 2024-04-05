@@ -106,7 +106,7 @@ def splitGC(flroot,datran='.dat',rann=0):
 
     fn = Table(fitsio.read(flroot.replace('global','dvs_ro') +app))
     if datran == '.ran':
-        fn.keep_columns(['RA', 'DEC', 'Z', 'WEIGHT', 'WEIGHT_FKP', 'TARGETID_DATA'])
+        fn.keep_columns(['RA', 'DEC', 'Z', 'WEIGHT', 'WEIGHT_FKP', 'TARGETID_DATA','TARGETID'])
     #c = SkyCoord(fn['RA']* u.deg,fn['DEC']* u.deg,frame='icrs')
     #gc = c.transform_to('galactic')
     sel_ngc = common.splitGC(fn)#gc.b > 0
@@ -118,10 +118,11 @@ def splitGC(flroot,datran='.dat',rann=0):
 
 
 def ran_col_assign(randoms,data,sample_columns,tracer):
-    data.rename_column('TARGETID', 'TARGETID_DATA')
+    if (not 'TARGETID_DATA' in data.colnames)&('TARGETID' in data.colnames):
+        data.rename_column('TARGETID', 'TARGETID_DATA')
     def _resamp(selregr,selregd):
         for col in sample_columns:
-            randoms[col] =  np.zeros(len(randoms))
+            randoms[col] =  np.zeros_like(data[col],shape=len(randoms))
         rand_sel = [selregr,~selregr]
         dat_sel = [ selregd,~selregd]
         for dsel,rsel in zip(dat_sel,rand_sel):
@@ -257,7 +258,7 @@ for tracer in tracers:
             subfrac = 0.66
         if args.mockver == 'AbacusSummit_v3':
             subfrac = 0.66
-    elif tracer == 'BGS_BRIGHT-21.5':
+    elif tracer[:3] == 'BGS':#_BRIGHT-21.5':
         zmin = 0.1
         zmax = 0.4
     mainp = main(tracer,'iron','Y1')

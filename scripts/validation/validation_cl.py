@@ -16,6 +16,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--version", help="catalog version",default='test')
 parser.add_argument("--survey", help="e.g., main (for all), DA02, any future DA",default='Y1')
 parser.add_argument("--tracers", help="all runs all for given survey",default='all')
+parser.add_argument("--use_map_veto",help="string to add on the end of full file reflecting if hp maps were used to cut",default='_HPmapcut')
+parser.add_argument("--weight_col", help="column name for weight",default='WEIGHT_SYS')
 parser.add_argument("--verspec",help="version for redshifts",default='iron')
 parser.add_argument("--data",help="LSS or mock directory",default='LSS')
 parser.add_argument("--ps",help="point size for density map",default=1,type=float)
@@ -144,9 +146,13 @@ zdw = ''
 
 for tp in tps:
     print('doing '+tp)
-    dtf = fitsio.read(indir+tp+zdw+'_full.dat.fits')
-    ran = fitsio.read(indir+tp+zdw+'_0_full.ran.fits')
-    fnreg = indir+'/regressis_data/main_'+tp+'_256/RF/main_'+tp+'_imaging_weight_256.npy'
+
+    dtf_raw = fitsio.read(indir+tp+zdw+'_full'+'.dat.fits')
+    ran_raw = fitsio.read(indir+tp+zdw+'_0_full'+'.ran.fits')
+
+    dtf = fitsio.read(indir+tp+zdw+'_full'+args.use_map_veto+'.dat.fits')
+    ran = fitsio.read(indir+tp+zdw+'_0_full'+args.use_map_veto+'.ran.fits')
+    fnreg = '/global/cfs/cdirs/desi/survey/catalogs/Y1/LSS/iron/LSScats/v0.1/regressis_data/main_LRG_256/RF/main_LRG_imaging_weight_256.npy' #region definitions should be static, could have loaded from regressis code...
     rfw = np.load(fnreg,allow_pickle=True)
     maskreg = rfw.item()['mask_region']
 
@@ -155,7 +161,7 @@ for tp in tps:
     sel_gz = common.goodz_infull(tp[:3],dtf)
     sel_obs = dtf['ZWARN'] != 999999
     dtfoz = dtf[sel_obs&sel_gz]
-    wt = 1./dtfoz['FRACZ_TILELOCID']*dtfoz['WEIGHT_ZFAIL']*dtfoz['WEIGHT_SYS']
+    wt = 1./dtfoz['FRACZ_TILELOCID']*dtfoz['WEIGHT_ZFAIL']*dtfoz[args.weight_col]
     if 'FRAC_TLOBS_TILES' in list(dtfoz.dtype.names):
         print('using FRAC_TLOBS_TILES')
         wt *= 1/dtfoz['FRAC_TLOBS_TILES']
@@ -177,7 +183,7 @@ for tp in tps:
 
     sel_zr = dtfoz['Z_not4clus'] > zmin
     sel_zr &= dtfoz['Z_not4clus'] < zmax
-    delta_raw,fsky,frac = get_delta(dtf,ran,maskreg=maskreg)
+    delta_raw,fsky,frac = get_delta(dtf_raw,ran_raw,maskreg=maskreg)
     cl_raw = hp.anafast(delta_raw)
     ell = np.arange(len(cl_raw))
     delta_allz,_,_ = get_delta(dtfoz,ran,wts=wt,maskreg=maskreg)
@@ -200,6 +206,7 @@ for tp in tps:
     print('doing w(theta)')
     sel = delta_raw != hp.UNSEEN
     angl,wth_raw = get_wtheta_auto(sindec[sel],cosdec[sel],sinra[sel],cosra[sel],delta_raw[sel],frac[sel])
+    sel = delta_allz != hp.UNSEEN
     _,wth_allz = get_wtheta_auto(sindec[sel],cosdec[sel],sinra[sel],cosra[sel],delta_allz[sel],frac[sel])
     _,wth_zr = get_wtheta_auto(sindec[sel],cosdec[sel],sinra[sel],cosra[sel],delta_zr[sel],frac[sel])
 

@@ -64,7 +64,7 @@ parser.add_argument("--add_tlcomp", help="add completeness FRAC_TLOBS_TILES to r
 parser.add_argument("--fillran", help="add imaging properties to randoms",default='n')
 parser.add_argument("--clusd", help="make the 'clustering' catalog intended for paircounts",default='n')
 parser.add_argument("--clusran", help="make the random clustering files; these are cut to a small subset of columns",default='n')
-parser.add_argument("--minr", help="minimum number for random files",default=0)
+parser.add_argument("--minr", help="minimum number for random files",default=0,type=int)
 parser.add_argument("--maxr", help="maximum for random files, 18 are available (use parallel script for all)",default=18,type=int) 
 parser.add_argument("--nz", help="get n(z) for type and all subtypes",default='n')
 parser.add_argument("--nzfull", help="get n(z) from full files",default='n')
@@ -87,6 +87,7 @@ parser.add_argument("--add_sysnet",help="add sysnet weights for imaging systemat
 parser.add_argument("--imsys_zbin",help="if yes, do imaging systematic regressions in z bins",default='y')
 
 parser.add_argument("--imsys",help="add weights for imaging systematics using eboss method?",default='n')
+parser.add_argument("--nran4imsys",help="number of random files to using for linear regression",default=1,type=int)
 
 parser.add_argument("--regressis",help="RF weights for imaging systematics?",default='n')
 parser.add_argument("--add_regressis",help="add RF weights for imaging systematics?",default='n')
@@ -236,6 +237,12 @@ if not os.path.exists(ldirspec+'LSScats'):
     print('made '+ldirspec+'LSScats')
 
 dirout = ldirspec+'LSScats/'+version+'/'
+
+if not os.path.exists(dirout):
+    os.mkdir(dirout)
+    print('made '+dirout)
+
+
 logfn = dirout+'log.txt'
 if os.path.isfile(logfn):
     logf = open(logfn,'a')
@@ -406,6 +413,8 @@ if args.mkHPmaps == 'y':
     lssmapdir = '/global/cfs/cdirs/desi/survey/catalogs/external_input_maps/'
     rancatname = dirout+tracer_clus+'_*_full.ran.fits'
     rancatlist = sorted(glob.glob(rancatname))
+    print(dirout)
+    print(rancatlist)
     fieldslist = allmapcols
     masklist = list(np.zeros(len(fieldslist),dtype=int))
     
@@ -549,7 +558,7 @@ if args.add_ke == 'y':
             #if args.test == 'n':
         common.write_LSS(res,fn,comments=['added k+e corrections'])
 
-if type == 'BGS_BRIGHT-21.5' and args.survey == 'Y1':
+if type == 'BGS_BRIGHT-21.5' and args.survey == 'Y1': #and args.clusd == 'y':
     ffull = dirout+type+notqso+'_full'+args.use_map_veto+'.dat.fits'
     if os.path.isfile(ffull) == False or args.redoBGS215 == 'y':
         logf.write('making BGS_BRIGHT-21.5 full data catalog for '+str(datetime.now()))
@@ -566,7 +575,18 @@ if args.add_bitweight == 'y':
     logf.write('added bitweights to data catalogs for '+tp+' '+str(datetime.now()))
     fn = dirout+type+notqso+'_full'+args.use_map_veto+'.dat.fits'
     print(fn)
-    ff = fitsio.read(fn)
+    ff = Table(fitsio.read(fn))
+    try:
+        ff.remove_columns(['BITWEIGHTS_1','PROB_OBS_1','BITWEIGHTS_2','PROB_OBS_2'])
+        print('removed ','BITWEIGHTS_1','PROBOBS_1','BITWEIGHTS_2','PROBOBS_2')
+    except:
+        print('not removing 1/2 bitweights')
+    try:
+        ff.remove_columns(['BITWEIGHTS','PROB_OBS'])
+        print('removed ','BITWEIGHTS','PROB_OBS')
+    except:
+        print('not removing bitweights')
+
     if type[:3] != 'BGS':
         bitf = fitsio.read(mainp.darkbitweightfile)
     else:
@@ -718,7 +738,7 @@ if args.imsys == 'y':
     selobs = dat['ZWARN'] != 999999
     dat = dat[selgood&selobs]
     ranl = []
-    for i in range(0,1):#int(args.maxr)):
+    for i in range(0,args.nran4imsys):#int(args.maxr)):
         ran = fitsio.read(os.path.join(dirout, tpstr+'_'+str(i)+'_full'+args.use_map_veto+'.ran.fits'), columns=['RA', 'DEC','PHOTSYS']) 
         ranl.append(ran)
     rands = np.concatenate(ranl)
@@ -1029,6 +1049,16 @@ if args.add_sysnet == 'y':
 
             #print(np.sum(sel))
             dd['WEIGHT_SN'][sel&selz] = hpmap[dpix[sel&selz]]
+            if tracer_clus == 'ELG_LOPnotqso':
+                if zl[0] == 0.8:
+                    selz = dd['Z_not4clus'] <= zl[0]
+                if zl[1] == 1.6:
+                    selz = dd['Z_not4clus'] > zl[1]
+                dd['WEIGHT_SN'][sel&selz] = hpmap[dpix[sel&selz]]
+        #assign weights to galaxies outside the z ranges
+        if tracer_clus == 'ELG_LOPnotqso':
+            zwl = '0.8_1.1'
+            
     #print(np.min(dd['WEIGHT_SYS']),np.max(dd['WEIGHT_SYS']),np.std(dd['WEIGHT_SYS']))
     comments = []
     comments.append("Using sysnet for WEIGHT_SYS")
@@ -1047,7 +1077,7 @@ if args.ran_utlid == 'y':
 if mkclusdat:
     ct.mkclusdat(dirout+type+notqso,tp=type,dchi2=dchi2,tsnrcut=tsnrcut,zmin=zmin,zmax=zmax,wsyscol=args.imsys_colname,use_map_veto=args.use_map_veto)#,ntilecut=ntile,ccut=ccut)
 
-inds = np.arange(args.minr,args.maxr)
+inds = np.arange(rm,rx)
 if mkclusran:
     print('doing clustering randoms (possibly a 2nd time to get sys columns in)')
 #     tsnrcol = 'TSNR2_ELG'
@@ -1082,7 +1112,7 @@ if mkclusran:
 
 if args.NStoGC == 'y':
     fb = dirout+tracer_clus+'_'
-    ct.clusNStoGC(fb, args.maxr - args.minr)#,par=args.par)
+    ct.clusNStoGC(fb, rx - rm)#,par=args.par)
 
 
 if type == 'QSO':
@@ -1103,7 +1133,7 @@ if type[:3] == 'ELG':
 if type[:3] == 'BGS':
     P0 = 7000
 
-nran = args.maxr-args.minr
+nran = rx-rm
 regions = ['NGC', 'SGC']
 
 def splitGC(flroot,datran='.dat',rann=0):

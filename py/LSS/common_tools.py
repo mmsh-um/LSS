@@ -27,7 +27,7 @@ def thphi2radec(theta,phi):
 
 #functions that shouldn't have any dependence on survey go here
 
-def cut_specdat(dz,badfib=None):
+def cut_specdat(dz,badfib=None,tsnr_min=0,tsnr_col='TSNR2_ELG'):
     from desitarget.targetmask import zwarn_mask
     selz = dz['ZWARN'] != 999999
     selz &= dz['ZWARN']*0 == 0 #just in case of nans
@@ -47,6 +47,10 @@ def cut_specdat(dz,badfib=None):
         bad = np.isin(fs['FIBER'],badfib)
         print('number at bad fibers '+str(sum(bad)))
         wfqa &= ~bad
+    if tsnr_min > 0:
+        low_tsnr = dz[tsnr_col] < tsnr_min
+        wfqa &= ~low_tsnr
+        print('number at low tsnr2 '+str(sum(low_tsnr)))
     return fs[wfqa]
 
 def goodz_infull(tp,dz,zcol='Z_not4clus'):
@@ -1425,7 +1429,6 @@ def combtiles_wdup_altmtl(pa_hdu, tiles, fbadir, outf, tarf, addcols=['TARGETID'
             fa = join(fa,ft,keys=['TARGETID'])
             if len(fa) != lb4join:
                 print(tile,lb4join,len(fa))
-
         sel = fa['TARGETID'] >= 0
         fa = fa[sel]
         td += 1
@@ -1506,3 +1509,7 @@ def return_altmtl_fba_fadate(tileid):
     fhtOrig = fitsio.read_header(FAOrigName)
     fadate = fhtOrig['RUNDATE']
     return ''.join(fadate.split('T')[0].split('-'))
+
+def return_hp_givenradec(nside, ra, dec):
+    theta, phi = np.radians(90-dec), np.radians(ra)
+    return hp.ang2pix(nside, theta, phi, nest=True)
