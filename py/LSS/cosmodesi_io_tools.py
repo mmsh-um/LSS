@@ -253,41 +253,32 @@ def get_clustering_positions_weights(catalog, distance, zlim=(0., np.inf),maglim
         print('multiplying weights by WEIGHT_focal')
         
     if name == 'data' and 'bitwise' in weight_type:
+        print("Doing bitwise")
         if 'default' in weight_type:
-<<<<<<< HEAD
-            weights /= catalog['WEIGHT_COMP'][mask]
-            print('dividing weights by WEIGHT_COMP')
-=======
             #weights /= catalog['WEIGHT_COMP'][mask]
             weights = catalog['WEIGHT_SYS'][mask]*catalog['WEIGHT_ZFAIL'][mask]#/(129/(1+128*catalog['PROB_OBS'][mask]))
             #print('dividing weights by WEIGHT_COMP')
->>>>>>> main
+            print("Doing default bitwise")
         weights = _format_bitweights(catalog['BITWEIGHTS'][mask]) + [weights]
     if name == 'data' and 'IIP' in weight_type:
-        weights = 129/(1+128*catalog['PROB_OBS'][mask])
+        #weights = 129/(1+128*catalog['PROB_OBS'][mask])
+        print("Doing IIP")
+        weights = catalog['WEIGHT_IIP'][mask]
         if 'default' in weight_type:
             #weights /= catalog['WEIGHT_COMP'][mask]
+            print("Doing default IIP.")
             weights *= catalog['WEIGHT_SYS'][mask]*catalog['WEIGHT_ZFAIL'][mask]
 
     if name == 'randoms':
         #if 'default' in weight_type:
         #    weights *= catalog['WEIGHT'][mask]
         if 'bitwise' in weight_type and 'default' in weight_type:
-<<<<<<< HEAD
-            weights /= catalog['FRAC_TLOBS_TILES'][mask]
-            print('dividing weights by FRAC_TLOBS_TILES')
-
-#     if name == 'randoms':
-#         if 'default' in weight_type:
-#             weights *= catalog['WEIGHT'][mask]
-=======
             weights = np.ones_like(positions[0])#catalog['WEIGHT_SYS'][mask]*catalog['WEIGHT_ZFAIL'][mask]
         if 'IIP' in weight_type and 'default' in weight_type:
             weights = np.ones_like(positions[0])#catalog['WEIGHT_SYS'][mask]*catalog['WEIGHT_ZFAIL'][mask]
         logger.info('all random weights set to 1')
             #weights /= catalog['FRAC_TLOBS_TILES'][mask]
             #print('dividing weights by FRAC_TLOBS_TILES')
->>>>>>> main
 #         if 'RF' in weight_type:
 #             weights *= catalog['WEIGHT_RF'][mask]*catalog['WEIGHT_COMP'][mask]
 #         if 'zfail' in weight_type:

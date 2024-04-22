@@ -31,11 +31,11 @@ parser.add_argument("--emulate", help = "do emulation if y", default='n')
 parser.add_argument("--clear_files", default = 'n')
 parser.add_argument("--copy_files", default = 'n')
 parser.add_argument("--foflinklen", default = '0.02')
-parser.add_argument("--emubeta0", default = '0.7')
-parser.add_argument("--emubeta1", default = '0.')
-parser.add_argument("--adj_qref", default = 'n')
-parser.add_argument("--skipntilespec", default = 'n')
-#parser.add_argument("--deco", help = "anticorrelation parameter for emulator", default = 0.1)
+parser.add_argument("--emubeta0", default = '0.7', type = str)
+parser.add_argument("--emubeta1", default = '0.', type = str)
+parser.add_argument("--adj_qref", default = 'n', type = str)
+parser.add_argument("--deco", help = "anticorrelation parameter for emulator", default = str(0.1))
+parser.add_argument("--kernel", help = 'which kernel to use', default = 'data_trained')
 args = parser.parse_args()
 tracer_arr = np.array(args.tracer)
 tracer_string = " ".join(tracer_arr)
@@ -50,7 +50,7 @@ if args.mockver == "EZmock":
     subdir = "EZmock"
 else:
     prep_script = "/global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/mock_tools/prepare_mocks_Y1.py"
-    subdir = "AbacusSummit_v4_1"
+    subdir = "AbacusSummit_v3"
 
 
 # getpota_indir = args.base_output + add_string 
@@ -70,15 +70,15 @@ DESIwemu_outdir = args.emulator_dir + "fof_v1.0/in/"
 # else:
 #     cmd_string1 = "python %s --rbandcut 19.5 --mockver %s --prog %s --downsampling n --overwrite 1 --realmin %s --realmax %s --base_output %s" %(prep_script, args.mockver, args.prog.lower(), args.real, int(args.real) + 1, args.base_output)
 # cmd_string2 = "python /global/homes/s/sikandar/PerlmutterLSS/LSS/scripts/getpotaY1_mock.py --base_output %s --prog %s --realization %s --base_input %s --mock %s --tile-temp-dir %s"%(getpota_outdir, args.prog.upper(), args.real, getpota_indir, args.mockver,getpota_tiledir)
-cmd_string3 = "python /global/common/software/desi/users/sikandar/LSS/scripts/mock_tools/NTILE_assign.py --indir %s --tracer %s --tileloc_add y --prog %s --skip_spec %s"%(NTILE_assign_indir, tracer_string, args.prog.upper(), args.skipntilespec)
+cmd_string3 = "python /global/common/software/desi/users/sikandar/LSS/scripts/mock_tools/NTILE_assign.py --indir %s --tracer %s --tileloc_add y --prog %s"%(NTILE_assign_indir, tracer_string, args.prog.upper())
 
 cmd_string4 = {}
 for i in range(len(tracer_arr)):
     cmd_string4[tracer_arr[i]] = "python %sDESI_wemu.py --mocknumber %s --tracer %s --basedir %s --prog %s --overwrite y --outdir %s --mocktype %s"%(args.emulator_dir, args.real, tracer_arr[i], DESIwemu_indir, args.prog.upper(),DESIwemu_outdir, args.mockver)
 #     if i==0:
-#         cmd_string4[tracer_arr[i]] = "python %sDESIAbacuswemu.py --mocknumber %s --tracer %s --basedir %s --prog %s --overwrite y --outdir %s --mocktype %s"%(args.emulator_dir, args.real, tracer_arr[i], DESIwemu_indir, args.prog.upper(),DESIwemu_outdir, args.mockver)
+#         cmd_string4[tracer_arr[i]] = "python %sDESI_wemu.py --mocknumber %s --tracer %s --basedir %s --prog %s --overwrite y --outdir %s --mocktype %s"%(args.emulator_dir, args.real, tracer_arr[i], DESIwemu_indir, args.prog.upper(),DESIwemu_outdir, args.mockver)
 #     else: 
-#         cmd_string4[tracer_arr[i]] = "python %sDESIAbacuswemu.py --mocknumber %s --tracer %s --basedir %s --prog %s --overwrite y --outdir %s --mocktype %s skip_specy"%(args.emulator_dir, args.real, tracer_arr[i], DESIwemu_indir, args.prog.upper(),DESIwemu_outdir, args.mockver)
+#         cmd_string4[tracer_arr[i]] = "python %sDESI_wemu.py --mocknumber %s --tracer %s --basedir %s --prog %s --overwrite y --outdir %s --mocktype %s skip_specy"%(args.emulator_dir, args.real, tracer_arr[i], DESIwemu_indir, args.prog.upper(),DESIwemu_outdir, args.mockver)
 # print(cmd_string1)
 # print(cmd_string2)
 print(cmd_string3)
@@ -88,11 +88,11 @@ if args.prep == 'y':
    # print("Done with prepare_mocks_y1")
    # subprocess.run(cmd_string2, shell = True)
    # print("Done with getpotaY1_mock")
-    print("Starting NTILE_assign")
-    subprocess.run(cmd_string3, shell = True)
-    print("done with NTILE_assign")
+  #  print("Starting NTILE_assign")
+   # subprocess.run(cmd_string3, shell = True)
+   # print("done with NTILE_assign")
+    print("doing wemu")
     for i in args.tracer:
-        print("Making fof input for tracer ", i)
         subprocess.run(cmd_string4[i], shell = True)
     print("all done")
 else:
@@ -114,8 +114,8 @@ for tr_i in tracer_arr:
     new_tartype0 = np.unique(intable[4])[0]
     new_target = tardict[new_tartype0]
     new_galcap = args.galcap
-    out_dir = emulator_basedir + "fof_v1.0/out/" + args.mockver + "/"
-    emu_out_dir = emulator_basedir + "emulate_bitw_v1.1/out/" + args.mockver + "/"
+    out_dir = emulator_basedir + "fof_v1.0/out/" + args.mockver + "/" + args.kernel + "/"
+    emu_out_dir = emulator_basedir + "emulate_bitw_v1.1/out/" + args.mockver + "/" + args.kernel + "/"
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
         print('made ' + out_dir)
@@ -170,16 +170,21 @@ for tr_i in tracer_arr:
     ## emulate
     if new_target == "BGS":
         selmskfile = "forFAemu_data_BGS.dat"
-    else:
+    elif (new_target != "BGS") and (args.kernel == 'data_trained'):
         selmskfile = "forFAemu_data.dat"
-
+    elif (new_target != "BGS") and (args.kernel == 'altmtl_trained'):
+        selmskfile = "forFAemu_altmtl_0.dat"
+    
     emu_naminpart = new_namout_part
     emu_naminselmsk = emulator_basedir + "fof_v1.0/in/" + selmskfile
-    emu_pfxselprop = emulator_basedir + "emulate_bitw_v1.1/out/" + args.mockver + "/" + "FAemu_m" + args.real + "_" + args.galcap + "_" + new_target + "_llen" + args.foflinklen + "_beta" + args.emubeta1 + "_truent_cfc_"
-    emu_naminqref = emulator_basedir + "emulate_bitw_v1.1/out/TrainedEmulator_Data/FAemu_data_" + args.galcap + "_" + new_target + "_llen" + "0.02" + "_truent_cfc_antico_deco0.1_beta0_indselfrac_cfc_qm.dat"
-    emu_pfxout = emulator_basedir + "emulate_bitw_v1.1/out/" + args.mockver + "/FAemu_m" + args.real + "_" + args.galcap + "_" + new_target + "_llen" + args.foflinklen + "_beta" + args.emubeta1 +  "_truent_cfc_nbits217_"
+    emu_pfxselprop = emu_out_dir + "/" + "FAemu_m" + args.real + "_" + args.galcap + "_" + new_target + "_llen" + args.foflinklen + "_beta0" + args.emubeta0 + "_beta1" + args.emubeta1 + "deco_" + args.deco + "_truent_cfc_"
+    if args.kernel == 'data_trained':
+        emu_naminqref = emulator_basedir + "emulate_bitw_v1.1/out/TrainedEmulator_Data/FAemu_data_" + args.galcap + "_" + new_target + "_llen" + "0.02" + "_truent_cfc_antico_deco0.1_beta0_indselfrac_cfc_qm.dat"
+    elif args.kernel == 'altmtl_trained':
+        emu_naminqref = emulator_basedir + "emulate_bitw_v1.1/out/TrainedEmulator_altMTL/FAemu_altmtl_0_" + args.galcap + "_" + new_target + "_llen" + "0.02" + "_truent_cfc_antico_deco0.1_beta0_indselfrac_cfc_qm.dat"
+    emu_pfxout = emu_out_dir + "/FAemu_m" + args.real + "_" + args.galcap + "_" + new_target + "_llen" + args.foflinklen + "_beta0" + args.emubeta0 + "_beta1" + args.emubeta1 + "deco_" + args.deco +  "_truent_cfc_nbits217_"
     emu_npart = len(intable)
-
+    
     # Define the file path
     file_path = emulator_basedir + "/emulate_bitw_v1.1/INI_emulate_bitw_lightcone_ntile.txt"
 
@@ -207,9 +212,9 @@ for tr_i in tracer_arr:
         elif lines[i].startswith("emu_dir"):
             lines[i] = f"emu_dir     '{emulator_basedir + 'emulate_bitw_v1.1/'}'\n"
         elif lines[i].startswith("beta0"):
-            lines[i] = f"beta      {args.emubeta0 + 'd0'}\n"
+            lines[i] = f"beta0      {args.emubeta0 + 'd0'}\n"
         elif lines[i].startswith("beta1"):
-            lines[i] = f"beta      {args.emubeta1 + 'd0'}\n"
+            lines[i] = f"beta1      {args.emubeta1 + 'd0'}\n"
         elif lines[i].startswith("adj_qref_lg"):
             if args.adj_qref == 'y':
                 lines[i] = f"adj_qref_lg        {'T'}\n"
@@ -217,11 +222,12 @@ for tr_i in tracer_arr:
                 lines[i] = f"adj_qref_lg        {'F'}\n"
         elif lines[i].startswith("mocknum"):
             lines[i] = f"mocknum     {args.real}\n"
-        
+        elif lines[i].startswith("deco"):
+            lines[i] = f"deco      {args.deco + 'd0'}\n"
 
 
     # Write the modified content back to the same file
-    file_path_new_emu = emulator_basedir + "/emulate_bitw_v1.1/INI_emulate_bitw_lightcone_ntile_%s_%s_ll_%s_beta_%s.txt"%(args.mockver, args.real, args.foflinklen, args.emubeta1)
+    file_path_new_emu = emulator_basedir + "/emulate_bitw_v1.1/INI_emulate_bitw_lightcone_ntile_%s_%s_ll_%s_beta0_%s_beta1_%s_deco_%s.txt"%(args.mockver, args.real, args.foflinklen, args.emubeta0, args.emubeta1, args.deco)
     with open(file_path_new_emu, "w") as file:
         file.writelines(lines)
 
@@ -238,22 +244,22 @@ for tr_i in tracer_arr:
         errorfn = emulator_basedir + "fof_v1.0/log/" + "ERR_" + args.mockver + "_fof_" + new_target + "_llen" + args.foflinklen + "_" + args.galcap + "_m" + args.real + "_datatrain.txt"
         print(cmd_string5)
         print(cmd_string6)
-        with open(outputfn, "w+") as output, open(errorfn, "w+") as errorf:
-             subprocess.run(cmd_string5, shell=True)
-             subprocess.run(cmd_string6, shell=True, stdout=output, stderr = errorf)
+       # with open(outputfn, "w+") as output, open(errorfn, "w+") as errorf:
+           #  subprocess.run(cmd_string5, shell=True)
+           #  subprocess.run(cmd_string6, shell=True, stdout=output, stderr = errorf)
         print("done fof")
 
 
         print("starting emulation")
         cmd_string7 = "sh " + emulator_basedir + "emulate_bitw_v1.1/COMPILE.sh"
         cmd_string8 = emulator_basedir + "emulate_bitw_v1.1/emulate_bitw_lightcone_ntile " + file_path_new_emu
-        outputfnemu = emulator_basedir + "emulate_bitw_v1.1/log/" + args.mockver + "_emu_" + new_target + "_llen"+ args.foflinklen +"_" + args.galcap + "_m" + args.real + "_datatrain.txt"
-        errorfnemu = emulator_basedir + "emulate_bitw_v1.1/log/" + "ERR_" + args.mockver + "_emu_" + new_target + "_llen"+ args.foflinklen +"_" + args.galcap + "_m" + args.real + "_datatrain.txt"
+        outputfnemu = emulator_basedir + "emulate_bitw_v1.1/log/" + args.mockver + "_emu_" + new_target + "_llen"+ args.foflinklen +"_" + args.galcap + "_m" + args.real + "_beta0" + args.emubeta0 + "beta1_" + args.emubeta1 + "deco_" + args.deco + "_" + args.kernel + ".txt"
+        errorfnemu = emulator_basedir + "emulate_bitw_v1.1/log/" + "ERR_" + args.mockver + "_emu_" + new_target + "_llen"+ args.foflinklen +"_" + args.galcap + "_m" + args.real + "_beta0" + args.emubeta0 + "beta1_" + args.emubeta1 + "deco_" + args.deco + "_" + args.kernel + ".txt"
         print(cmd_string7)
         print(cmd_string8)
         with open(outputfnemu, "w+") as output, open(errorfnemu, "w+") as errorf:
-             subprocess.run(cmd_string7, shell=True)
-             subprocess.run(cmd_string8, shell=True, stdout=output, stderr = errorf)
+            subprocess.run(cmd_string7, shell=True)
+            subprocess.run(cmd_string8, shell=True, stdout=output, stderr = errorf)
         print("done emulation")
 
 
@@ -262,7 +268,7 @@ for tr_i in tracer_arr:
 
         # WEIGHTS
         nwe = 9
-        namin_fbw = emulator_basedir + "emulate_bitw_v1.1/out/" + args.mockver + "/FAemu_m" + args.real + "_" + args.galcap + "_" + new_target + "_llen"+ args.foflinklen + "_beta" + args.emubeta1 + "_truent_cfc_nbits217_" + "wemu_unformatted.dat"
+        namin_fbw = emu_out_dir + "/FAemu_m" + args.real + "_" + args.galcap + "_" + new_target + "_llen"+ args.foflinklen + "_beta0" + args.emubeta0 + "_beta1" + args.emubeta1 + "deco_" + args.deco +  "_truent_cfc_nbits217_" + "wemu_unformatted.dat"
 
         f = FortranFile(namin_fbw, 'r')
         we = f.read_ints(dtype='int32')
@@ -373,7 +379,7 @@ for tr_i in tracer_arr:
             os.makedirs(emucat_outdir)
             print('made ' + emucat_outdir)
 
-        namout_bool = emucat_outdir + args.mockver + '_' + new_target + '_' + args.galcap + '_bool_tot_datatrain_m' + args.real + '.bin'
+        namout_bool = emucat_outdir + args.mockver + '_' + new_target + '_' + args.galcap + '_bool_tot_' + args.kernel + '_m' + args.real + "_beta0" + args.emubeta0 + "_beta1" + args.emubeta1 + "deco_" + args.deco +  '.bin'
 
         # ### write bool array (just for convenience, not to have to recompute it)
 
@@ -475,7 +481,7 @@ for tr_i in tracer_arr:
         #targetid = np.arange(1, len(RA)+1, dtype=int)
 
         #namout_tot = '/global/cfs/cdirs/desi/survey/catalogs/main/mocks/FAemu_preliminary/sikandar/Updated_Code_CFC/emulate_bitw_v1.1/out/Abacus2Outputs_TrainedOnData/mocks_new/Catalogs_With_Weights/Ab2_corr_clustering_cat_FAemu_m' + args.real + '_B_BGS_llen0.02_truent_cfc.fits'
-        namout_tot = emu_out_dir + args.mockver + '_corr_clustering_cat_FAemu_m' + args.real + '_' + args.galcap + '_' + new_target + '_llen'+ args.foflinklen + "_beta" + args.emubeta1 + '_truent_cfc.fits'
+        namout_tot = emu_out_dir + args.mockver + '_corr_clustering_cat_FAemu_m' + args.real + '_' + args.galcap + '_' + new_target + '_llen'+ args.foflinklen + "_beta0" + args.emubeta0 + "_beta1" + args.emubeta1 + "deco_" + args.deco +  '_truent_cfc.fits'
 
         col1 = fits.Column(name='TARGETID', array=targetid[id_msk_obs], format='K')
         col2 = fits.Column(name='RA', array=RA[id_msk_obs], format='E')
@@ -484,7 +490,7 @@ for tr_i in tracer_arr:
         col5 = fits.Column(name='RSDZ', array=rsdz[id_msk_obs], format='E')
         col6 = fits.Column(name='NTILE', array=ntile[id_msk_obs], format='K')
         col7 = fits.Column(name='WEIGHT_IIP', array=wiip[id_msk_obs], format='E')
-        col8 = fits.Column(name='BITWEIGHTS', array=we_out[id_msk_obs], dim='4', format='4K')
+        col8 = fits.Column(name='BITWEIGHT', array=we_out[id_msk_obs], dim='4', format='4K')
         #col8 = fits.Column(name='DESI_TARGET', array=DESI_target[id_msk_obs], format='K')
         #col9 = fits.Column(name='TRUEZ', array=truez[id_msk_obs], format='E')
         #col10 = fits.Column(name='RCH_MASK', array=rchmsk[id_msk_obs], format='L')
@@ -506,10 +512,10 @@ for tr_i in tracer_arr:
         data_test = hdul[1].data
         #print(data_test)
         print(np.shape(data_test['RA']))
-        print(np.shape(data_test['BITWEIGHTS']))
+        print(np.shape(data_test['BITWEIGHT']))
         print(data_test['TARGETID'])
         print(data_test['WEIGHT_IIP'])
-        print(data_test['BITWEIGHTS'])
+        print(data_test['BITWEIGHT'])
 
         print("DONE realisation ", args.real)
 
@@ -528,25 +534,31 @@ for tr_i in tracer_arr:
         #     add_string = ""
         add_string = ""
 
-        emu_out_dir = args.emulator_dir + "emulate_bitw_v1.1/out/" + args.mockver + "/"
+        emu_out_dir = emulator_basedir + "emulate_bitw_v1.1/out/" + args.mockver + "/" + args.kernel + "/"
         if args.mockver == "EZmock":
             pathstr = "SecondGenMocks/EZmock/"
-        # elif args.mockver == "ab_secondgen_cosmosim":
+        # else:
         #     pathstr = "SecondGenMocks/AbacusSummit/"
-        elif args.mockver == "AbacusSummit_v4_1":
-            pathstr = "SecondGenMocks/AbacusSummit_v4_1/"
+        elif args.mockver == "AbacusSummit_v3":
+            pathstr = "SecondGenMocks/AbacusSummit_v3/"
 
         if new_target == "ELG":
             target_write_name = "ELG_LOP"
         else:
             target_write_name = new_target
         unred_path = args.base_output + add_string + pathstr + "mock" + str(args.real) + "/"
-        emu_in = Table.read(emu_out_dir + args.mockver + '_corr_clustering_cat_FAemu_m' + args.real + '_' + args.galcap + '_' + new_target + '_llen'+ args.foflinklen + "_beta" + args.emubeta1 + '_truent_cfc.fits')
-        unreduced = Table.read(unred_path + '/pota-' + args.prog.upper() + '_joined_unreduced_%s.fits'%new_target)
+        emu_in = Table.read(emu_out_dir + args.mockver + '_corr_clustering_cat_FAemu_m' + args.real + '_' + args.galcap + '_' + new_target + '_llen'+ args.foflinklen + "_beta0" + args.emubeta0 + "_beta1" + args.emubeta1 + "deco_" + args.deco + '_truent_cfc.fits')
+        unreduced_tab_path = unred_path + '/pota-' + args.prog.upper() + '_joined_unreduced_%s.fits'%new_target
+        print("unreduced_tab_path = ", unreduced_tab_path)
+        unreduced = Table.read(unreduced_tab_path)
+        print("Unreduced length = ", len(unreduced))
+        print("emu_in length = ", len(emu_in))
         emu_in.remove_columns(['RA', 'DEC', 'RSDZ', 'TRUEZ', 'NTILE'])
         cat_join = join(unreduced, emu_in, keys = 'TARGETID', join_type='left')
-        outdir_data = unred_path + "ffa_full_" + target_write_name + ".fits"
+        print("cat_join length = ", len(cat_join))
+        outdir_data = "/pscratch/sd/s/sikandar/AbacusV3Dump/" + "mock" + str(args.real) + "/" + "ffa_full_" + target_write_name + "_ll_" + args.foflinklen + "_beta0_" + args.emubeta0 + "_beta1_" + args.emubeta1 + "deco_" + args.deco + "_" + args.kernel + ".fits"
         join_red = cat_join[np.unique(cat_join["TARGETID"], return_index=True)[1]]
+        print("cat_join length after unique cut = ", len(join_red))
         join_red = ct.addNS(join_red)
         join_red.filled().write(outdir_data, overwrite = True)
 
